@@ -20,6 +20,7 @@
 
 #include <QObject>
 #include <QAbstractSocket>
+#include <QtEndian>
 
 #include "ElevateMode.h"
 
@@ -43,7 +44,26 @@ public slots:
     void retryConnect();
 
 private:
-    void intToBytes(int value, char* buffer, int size);
+    static inline void intToBytes(quint64 value, char* buffer, int size)
+    {
+        switch (size) {
+        case 1:
+            buffer[0] = static_cast<char>(value & 0xff);
+            break;
+        case 2:
+            qToBigEndian<quint16>(static_cast<quint16>(value), reinterpret_cast<uchar*>(buffer));
+            break;
+        case 4:
+            qToBigEndian<quint32>(static_cast<quint32>(value), reinterpret_cast<uchar*>(buffer));
+            break;
+        case 8:
+            qToBigEndian<quint64>(static_cast<quint64>(value), reinterpret_cast<uchar*>(buffer));
+            break;
+        default:
+            Q_ASSERT(false);
+            break;
+        }
+    }
 
 private slots:
     void connected();

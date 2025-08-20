@@ -252,6 +252,7 @@ if(INPUTLEAP_BUILD_TESTS)
     set(GUI_TEST_SOURCE_FILES
         test/KeySequenceTests.cpp
         test/HotkeyTests.cpp
+        test/IpcClientTests.cpp
         test/main.cpp
     )
 

@@ -110,12 +110,12 @@ void IpcClient::sendCommand(const QString& command, ElevateMode const elevate)
 
     std::string stdStringCommand = command.toStdString();
     const char* charCommand = stdStringCommand.c_str();
-    int length = static_cast<int>(strlen(charCommand));
+    quint32 length = static_cast<quint32>(strlen(charCommand));
 
     char lenBuf[4];
     intToBytes(length, lenBuf, 4);
     stream.writeRawData(lenBuf, 4);
-    stream.writeRawData(charCommand, length);
+    stream.writeRawData(charCommand, static_cast<int>(length));
 
     char elevateBuf[1];
     // Refer to enum ElevateMode documentation for why this flag is mapped this way
@@ -128,23 +128,3 @@ void IpcClient::handleReadLogLine(const QString& text)
     Q_EMIT readLogLine(text);
 }
 
-// TODO: qt must have a built in way of converting int to bytes.
-void IpcClient::intToBytes(int value, char *buffer, int size)
-{
-    if (size == 1) {
-        buffer[0] = value & 0xff;
-    }
-    else if (size == 2) {
-        buffer[0] = (value >> 8) & 0xff;
-        buffer[1] = value & 0xff;
-    }
-    else if (size == 4) {
-        buffer[0] = (value >> 24) & 0xff;
-        buffer[1] = (value >> 16) & 0xff;
-        buffer[2] = (value >> 8) & 0xff;
-        buffer[3] = value & 0xff;
-    }
-    else {
-        // TODO: other sizes, if needed.
-    }
-}
