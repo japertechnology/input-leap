@@ -16,6 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+// Entry point for the client application which connects to an Input Leap
+// server to share mouse and keyboard input.
 #include "inputleap/ClientApp.h"
 #include "arch/Arch.h"
 #include "base/Log.h"
@@ -38,12 +40,15 @@ int client_main(int argc, char** argv)
     ArchMiscWindows::setInstanceWin32(GetModuleHandle(nullptr));
 #endif
 
+    // Initialize platform abstraction layer and core services
     Arch arch;
     arch.init();
 
+    // Logging and event handling infrastructure
     Log log;
     EventQueue events;
 
+    // Run the client application which communicates with the server
     ClientApp app(&events, createTaskBarReceiver);
     int result = app.run(argc, argv);
 #if SYSAPI_WIN32
@@ -59,5 +64,6 @@ int client_main(int argc, char** argv)
 
 int main(int argc, char** argv)
 {
+    // Delegate to namespaced entry point; keeps global namespace clean
     return inputleap::client_main(argc, argv);
 }

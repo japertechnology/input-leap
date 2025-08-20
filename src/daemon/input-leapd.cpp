@@ -16,6 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+// Entry point for the platform-specific daemon responsible for running
+// Input Leap as a background service.
 #include "inputleap/win32/DaemonApp.h"
 
 #include <iostream>
@@ -25,6 +27,7 @@
 int
 main(int argc, char** argv)
 {
+    // Initialize and run the daemon using standard argc/argv parameters
     inputleap::DaemonApp app;
     return app.run(argc, argv);
 }
@@ -36,6 +39,7 @@ main(int argc, char** argv)
 int WINAPI
 WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {
+    // Windows entry point variant that uses global __argc/__argv values
     inputleap::DaemonApp app;
     return app.run(__argc, __argv);
 }

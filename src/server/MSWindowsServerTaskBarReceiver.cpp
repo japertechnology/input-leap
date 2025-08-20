@@ -18,6 +18,9 @@
 
 #include "MSWindowsServerTaskBarReceiver.h"
 
+// Implements the Windows-specific taskbar integration used by the server to
+// display status and allow quick user interaction from the system tray.
+
 #include "resource.h"
 #include "server/Server.h"
 #include "platform/MSWindowsClipboard.h"

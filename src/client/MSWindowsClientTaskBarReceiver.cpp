@@ -18,6 +18,10 @@
 
 #include "MSWindowsClientTaskBarReceiver.h"
 
+// Windows-specific taskbar integration for the client application. Handles
+// system tray icon updates and user interactions such as showing status or
+// exiting the client.
+
 #include "resource.h"
 #include "client/Client.h"
 #include "platform/MSWindowsClipboard.h"

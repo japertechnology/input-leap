@@ -15,9 +15,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+# Primary build configuration for the Input Leap project. This file defines
+# global compiler settings, available build options, and orchestrates the
+# inclusion of all source modules.
+
 cmake_minimum_required(VERSION 3.21)
 project(InputLeap C CXX)
 
+# Toggleable features that allow developers to customize the build. Most are
+# enabled by default but can be overridden via the command line.
 option(INPUTLEAP_BUILD_GUI "Build the GUI" ON)
 option(INPUTLEAP_BUILD_TESTS "Build the tests" ON)
 option(INPUTLEAP_USE_EXTERNAL_GTEST "Use external installation of Google Test framework" OFF)
@@ -27,6 +33,7 @@ option(INPUTLEAP_BUILD_GULRAK_FILESYSTEM "Use internal filesystem library" OFF)
 set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set (CMAKE_CXX_EXTENSIONS OFF)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
+# Place compiled binaries and libraries under a common build directory
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
