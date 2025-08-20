@@ -93,16 +93,17 @@ SecureSocket::close()
 void SecureSocket::freeSSLResources()
 {
     std::lock_guard<std::mutex> ssl_lock{ssl_mutex_};
+    if (m_ssl) {
+        if (m_ssl->m_ssl) {
+            SSL_shutdown(m_ssl->m_ssl);
+            SSL_free(m_ssl->m_ssl);
+            m_ssl->m_ssl = nullptr;
+        }
 
-    if (m_ssl->m_ssl != nullptr) {
-        SSL_shutdown(m_ssl->m_ssl);
-        SSL_free(m_ssl->m_ssl);
-        m_ssl->m_ssl = nullptr;
-    }
-
-    if (m_ssl->m_context != nullptr) {
-        SSL_CTX_free(m_ssl->m_context);
-        m_ssl->m_context = nullptr;
+        if (m_ssl->m_context) {
+            SSL_CTX_free(m_ssl->m_context);
+            m_ssl->m_context = nullptr;
+        }
     }
 }
 
