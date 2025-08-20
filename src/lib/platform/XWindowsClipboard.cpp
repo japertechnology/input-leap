@@ -529,9 +529,14 @@ XWindowsClipboard::icccmFillCache()
     }
 
     XWindowsUtil::convertAtomProperty(data);
-    const Atom* targets = reinterpret_cast<const Atom*>(data.data()); // TODO: Safe?
+    // Property data is expected to consist of whole Atoms.
+    if (data.size() % sizeof(Atom) != 0) {
+        data.clear();
+    }
     const std::uint32_t numTargets = data.size() / sizeof(Atom);
-    LOG_DEBUG("  available targets: %s", XWindowsUtil::atomsToString(m_display, targets, numTargets).c_str());
+    std::vector<Atom> targets(numTargets);
+    std::memcpy(targets.data(), data.data(), numTargets * sizeof(Atom));
+    LOG_DEBUG("  available targets: %s", XWindowsUtil::atomsToString(m_display, targets.data(), numTargets).c_str());
 
     // try each converter in order (because they're in order of
     // preference).
@@ -901,13 +906,18 @@ XWindowsClipboard::insertMultipleReply(Window requestor,
 
     // data is a list of atom pairs:  target, property
     XWindowsUtil::convertAtomProperty(data);
-    const Atom* targets = reinterpret_cast<const Atom*>(data.data());
+    // Property data is expected to consist of whole Atoms.
+    if (data.size() % sizeof(Atom) != 0) {
+        return false;
+    }
     const std::uint32_t numTargets = data.size() / sizeof(Atom);
+    std::vector<Atom> targets(numTargets);
+    std::memcpy(targets.data(), data.data(), numTargets * sizeof(Atom));
 
     // add replies for each target
     bool changed = false;
-    for (std::uint32_t i = 0; i < numTargets; i += 2) {
-        const Atom request_target   = targets[i + 0];
+    for (std::size_t i = 0; i + 1 < targets.size(); i += 2) {
+        const Atom request_target   = targets[i];
         const Atom request_property = targets[i + 1];
         if (!addSimpleRequest(requestor, request_target, time, request_property)) {
             // note that we can't perform the requested conversion
