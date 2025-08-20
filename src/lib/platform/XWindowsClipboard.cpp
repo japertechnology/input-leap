@@ -735,7 +735,10 @@ XWindowsClipboard::motifFillCache()
 
     // get the Motif item property from the root window
     char name[18 + 20];
-    sprintf(name, "_MOTIF_CLIP_ITEM_%d", header.m_item);
+    int len = std::snprintf(name, sizeof(name), "_MOTIF_CLIP_ITEM_%d", header.m_item);
+    if (len < 0 || static_cast<size_t>(len) >= sizeof(name)) {
+        return;
+    }
     Atom atomItem = m_impl->XInternAtom(m_display, name, False);
     data = "";
     if (!XWindowsUtil::getWindowProperty(m_display, root,
@@ -764,7 +767,10 @@ XWindowsClipboard::motifFillCache()
     MotifFormatMap motifFormats;
     for (std::int32_t i = 0; i < numFormats; ++i) {
         // get Motif format property from the root window
-        sprintf(name, "_MOTIF_CLIP_ITEM_%d", formats[i]);
+        int len = std::snprintf(name, sizeof(name), "_MOTIF_CLIP_ITEM_%d", formats[i]);
+        if (len < 0 || static_cast<size_t>(len) >= sizeof(name)) {
+            continue;
+        }
         Atom atomFormat = m_impl->XInternAtom(m_display, name, False);
         data.clear();
         if (!XWindowsUtil::getWindowProperty(m_display, root,
@@ -867,8 +873,11 @@ XWindowsClipboard::motifGetSelection(const MotifClipFormat* format,
     // property.  motif has some scheme for transferring part by
     // part that i don't know.
     char name[18 + 20];
-    sprintf(name, "_MOTIF_CLIP_ITEM_%d", format->m_data);
-       Atom target = m_impl->XInternAtom(m_display, name, False);
+    int len = std::snprintf(name, sizeof(name), "_MOTIF_CLIP_ITEM_%d", format->m_data);
+    if (len < 0 || static_cast<size_t>(len) >= sizeof(name)) {
+        return false;
+    }
+    Atom target = m_impl->XInternAtom(m_display, name, False);
     Window root = RootWindow(m_display, DefaultScreen(m_display));
     return XWindowsUtil::getWindowProperty(m_display, root, target, data,
                                            actualTarget, nullptr, False);
