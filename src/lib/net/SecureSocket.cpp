@@ -486,8 +486,11 @@ SecureSocket::secureConnect(int socket)
     // note that load_certificates acquires ssl_mutex_
     if (!load_certificates(inputleap::DataDirectories::ssl_certificate_path())) {
         LOG_ERR("could not load client certificates");
-        // FIXME: this is fatal error, but we current don't disconnect because whole logic in this
-        // function needs to be cleaned up
+        LOG_ERR("connection terminated due to certificate load failure");
+        isFatal(true);
+        secure_connect_retry_ = 0;
+        disconnect();
+        return -1;
     }
 
     std::lock_guard<std::mutex> ssl_lock{ssl_mutex_};
