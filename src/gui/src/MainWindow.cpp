@@ -834,15 +834,30 @@ void MainWindow::stop_cmd_app()
 
     set_connection_state(AppConnectionState::DISCONNECTED);
 
-    // HACK: deleting the object deletes the physical file, which is
-    // bad, since it could be in use by the Windows service!
-#if !defined(Q_OS_WIN)
-    delete m_pTempConfigFile;
-#endif
-    m_pTempConfigFile = nullptr;
+    cleanupTempConfigFile();
 
     // reset so that new connects cause auto-hide.
     m_AlreadyHidden = false;
+}
+
+void MainWindow::cleanupTempConfigFile()
+{
+    if (!m_pTempConfigFile)
+    {
+        return;
+    }
+
+#if defined(Q_OS_WIN)
+    // On Windows the file must be closed before deletion so that the
+    // underlying path can be removed without leaving a locked handle.
+    if (m_pTempConfigFile->isOpen())
+    {
+        m_pTempConfigFile->close();
+    }
+#endif
+
+    delete m_pTempConfigFile;
+    m_pTempConfigFile = nullptr;
 }
 
 void MainWindow::stopService()
