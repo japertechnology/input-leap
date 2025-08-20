@@ -625,7 +625,7 @@ void MainWindow::start_cmd_app()
     // launched the process (e.g. when launched with elevation). setting the
     // profile dir on launch ensures it uses the same profile dir is used
     // no matter how its relaunched.
-    args << "--profile-dir" << QString::fromStdString("\"" + inputleap::DataDirectories::profile().u8string() + "\"");
+    args << "--profile-dir" << QString::fromStdString(inputleap::DataDirectories::profile().u8string());
 #endif
 
     if ((app_role() == AppRole::Client && !clientArgs(args, app))
