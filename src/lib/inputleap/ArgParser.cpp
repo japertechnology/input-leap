@@ -524,7 +524,8 @@ bool ArgParser::searchDoubleQuotes(std::string& command, size_t& left, size_t& r
 void ArgParser::removeDoubleQuotes(std::string& arg)
 {
     // if string is surrounded by double quotes, remove them
-    if (arg[0] == '\"' &&
+    if (arg.size() >= 2 &&
+        arg[0] == '\"' &&
         arg[arg.size() - 1] == '\"') {
         arg = arg.substr(1, arg.size() - 2);
     }
