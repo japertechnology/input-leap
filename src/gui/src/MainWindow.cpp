@@ -393,9 +393,11 @@ void MainWindow::logOutput()
     {
         QString text(cmd_app_process_->readAllStandardOutput());
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-        const auto results = text.split(QRegularExpression("\r|\n|\r\n"));
+        const auto results = text.split(
+            QRegularExpression("\r\n|\n|\r"), Qt::SkipEmptyParts);
 #else
-        const auto results = text.split(QRegExp("\r|\n|\r\n"));
+        const auto results = text.split(
+            QRegExp("\r\n|\n|\r"), QString::SkipEmptyParts);
 #endif
         for (const auto& line : results) {
             if (!line.isEmpty())
@@ -435,9 +437,11 @@ void MainWindow::appendLogError(const QString& text)
 void MainWindow::appendLogRaw(const QString& text)
 {
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-    const auto lines = text.split(QRegularExpression("\r|\n|\r\n"));
+    const auto lines = text.split(
+        QRegularExpression("\r\n|\n|\r"), Qt::SkipEmptyParts);
 #else
-    const auto lines = text.split(QRegExp("\r|\n|\r\n"));
+    const auto lines = text.split(
+        QRegExp("\r\n|\n|\r"), QString::SkipEmptyParts);
 #endif
     for (const auto& line : lines) {
         if (!line.isEmpty()) {
