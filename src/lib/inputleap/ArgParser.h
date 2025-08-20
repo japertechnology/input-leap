@@ -37,6 +37,9 @@ public:
 class Argv {
 public:
     Argv(int argc, const char* const* argv);
+#if WINAPI_MSWINDOWS
+    Argv(int argc, const wchar_t* const* argv);
+#endif
 
     // Return the next argument (excluding argv[0]) and remove it from the list
     const char* shift();
@@ -62,6 +65,7 @@ public:
 
 private:
     std::deque<const char*> m_argv;
+    std::vector<std::string> m_storage;
     std::string m_exename;
 };
 

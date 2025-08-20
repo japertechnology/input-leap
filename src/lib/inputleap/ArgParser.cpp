@@ -28,6 +28,8 @@
 
 #ifdef WINAPI_MSWINDOWS
 #include <VersionHelpers.h>
+#include <shellapi.h>
+#include "common/win32/encoding_utilities.h"
 #endif
 
 namespace inputleap {
@@ -44,13 +46,51 @@ XArgvParserError::XArgvParserError(const char *fmt, ...) :
     message = std::string(buf);
 }
 
-Argv::Argv(int argc, const char* const* argv) :
-    // FIXME: we assume UTF-8 encoding, but on Windows this is not correct
-    m_exename(inputleap::fs::u8path(argv[0]).filename().u8string())
+Argv::Argv(int argc, const char* const* argv)
+#if !WINAPI_MSWINDOWS
+    : m_exename(inputleap::fs::u8path(argv[0]).filename().u8string())
+#endif
 {
-    for (int i = 1; i < argc; i++)
-        m_argv.push_back(argv[i]);
+#if WINAPI_MSWINDOWS
+    int wargc = 0;
+    LPWSTR* wargv = CommandLineToArgvW(GetCommandLineW(), &wargc);
+    if (wargv != nullptr) {
+        m_storage.reserve(wargc);
+        for (int i = 0; i < wargc; ++i) {
+            m_storage.push_back(win_wchar_to_utf8(wargv[i]));
+            if (i == 0) {
+                m_exename = inputleap::fs::u8path(m_storage.back()).filename().u8string();
+            }
+            else {
+                m_argv.push_back(m_storage.back().c_str());
+            }
+        }
+        LocalFree(wargv);
+    }
+#else
+    m_storage.reserve(argc);
+    for (int i = 1; i < argc; ++i) {
+        m_storage.emplace_back(argv[i]);
+        m_argv.push_back(m_storage.back().c_str());
+    }
+#endif
 }
+
+#if WINAPI_MSWINDOWS
+Argv::Argv(int argc, const wchar_t* const* argv)
+{
+    m_storage.reserve(argc);
+    for (int i = 0; i < argc; ++i) {
+        m_storage.push_back(win_wchar_to_utf8(argv[i]));
+        if (i == 0) {
+            m_exename = inputleap::fs::u8path(m_storage.back()).filename().u8string();
+        }
+        else {
+            m_argv.push_back(m_storage.back().c_str());
+        }
+    }
+}
+#endif
 
 const char*
 Argv::shift()
@@ -587,7 +627,6 @@ ArgParser::updateCommonArgs(Argv &argv)
 
 std::string ArgParser::parse_exename(const char* arg)
 {
-    // FIXME: we assume UTF-8 encoding, but on Windows this is not correct
     return inputleap::fs::u8path(arg).filename().u8string();
 }
 
