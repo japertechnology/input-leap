@@ -120,14 +120,14 @@ void Config::removeScreen(const std::string& name)
 	}
 
 	// remove aliases (and canonical name)
-    for (auto iter = m_nameToCanonicalName.begin(); iter != m_nameToCanonicalName.end(); ) {
-		if (iter->second == canonical) {
-			m_nameToCanonicalName.erase(iter++);
-		}
-		else {
-			++index;
-		}
-	}
+        for (auto iter = m_nameToCanonicalName.begin(); iter != m_nameToCanonicalName.end(); ) {
+                if (iter->second == canonical) {
+                        m_nameToCanonicalName.erase(iter++);
+                }
+                else {
+                        ++iter;
+                }
+        }
 }
 
 void
