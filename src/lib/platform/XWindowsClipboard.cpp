@@ -635,30 +635,41 @@ XWindowsClipboard::icccmGetTime() const
     }
 }
 
-bool
-XWindowsClipboard::motifLockClipboard() const
-{
-    // fail if anybody owns the lock (even us, so this is non-recursive)
-    Window lockOwner = m_impl->XGetSelectionOwner(m_display, m_atomMotifClipLock);
-    if (lockOwner != None) {
-        LOG_DEBUG1("motif lock owner 0x%08lx", lockOwner);
-        return false;
-    }
+bool XWindowsClipboard::motifLockClipboard() const {
+  // fail if anybody owns the lock (even us, so this is non-recursive)
+  Window lockOwner = m_impl->XGetSelectionOwner(m_display, m_atomMotifClipLock);
+  if (lockOwner != None) {
+    LOG_DEBUG1("motif lock owner 0x%08lx", lockOwner);
+    return false;
+  }
 
-    // try to grab the lock
-    // FIXME -- is this right?  there's a race condition here --
-    // A grabs successfully, B grabs successfully, A thinks it
-    // still has the grab until it gets a SelectionClear.
-    Time time = XWindowsUtil::getCurrentTime(m_display, m_window);
-    m_impl->XSetSelectionOwner(m_display, m_atomMotifClipLock, m_window, time);
-    lockOwner = m_impl->XGetSelectionOwner(m_display, m_atomMotifClipLock);
-    if (lockOwner != m_window) {
-        LOG_DEBUG1("motif lock owner 0x%08lx", lockOwner);
-        return false;
-    }
+  // try to grab the lock
+  Time time = XWindowsUtil::getCurrentTime(m_display, m_window);
+  m_impl->XSetSelectionOwner(m_display, m_atomMotifClipLock, m_window, time);
 
-    LOG_DEBUG1("locked motif clipboard");
-    return true;
+  // make sure the request has been processed and detect if another
+  // client stole the selection before we could confirm our lock
+  m_impl->XSync(m_display, False);
+
+  static auto predicate = [](Display *, XEvent *e, XPointer arg) -> Bool {
+    return (e->type == SelectionClear &&
+            e->xselectionclear.selection == reinterpret_cast<Atom>(arg));
+  };
+  XEvent event;
+  if (m_impl->XCheckIfEvent(m_display, &event, predicate,
+                            reinterpret_cast<XPointer>(m_atomMotifClipLock))) {
+    LOG_DEBUG1("motif lock lost due to competing owner");
+    return false;
+  }
+
+  lockOwner = m_impl->XGetSelectionOwner(m_display, m_atomMotifClipLock);
+  if (lockOwner != m_window) {
+    LOG_DEBUG1("motif lock owner 0x%08lx", lockOwner);
+    return false;
+  }
+
+  LOG_DEBUG1("locked motif clipboard");
+  return true;
 }
 
 void
