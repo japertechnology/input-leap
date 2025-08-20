@@ -223,4 +223,20 @@ TEST(ArgParserTests, assembleCommand_stringArrayWithSpace_returnCommand)
     EXPECT_EQ("\"stub1 space\" stub2 \"stub3 space\"", command);
 }
 
+TEST(ArgParserTests, removeDoubleQuotes_emptyString_noChange)
+{
+    std::string arg;
+    ArgParser::removeDoubleQuotes(arg);
+
+    EXPECT_TRUE(arg.empty());
+}
+
+TEST(ArgParserTests, removeDoubleQuotes_singleDoubleQuote_noChange)
+{
+    std::string arg = "\"";
+    ArgParser::removeDoubleQuotes(arg);
+
+    EXPECT_EQ("\"", arg);
+}
+
 } // namespace inputleap
