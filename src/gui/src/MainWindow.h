@@ -164,6 +164,7 @@ public slots:
         void proofreadInfo();
         void windowStateChanged();
         void updateSSLFingerprint();
+        void cleanupTempConfigFile();
 
     private:
         std::unique_ptr<Ui::MainWindow> ui_;
