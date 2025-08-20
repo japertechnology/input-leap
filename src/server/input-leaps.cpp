@@ -16,6 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+// Entry point for the server application which shares mouse and keyboard
+// events with connected clients.
 #include "inputleap/ServerApp.h"
 #include "arch/Arch.h"
 #include "base/Log.h"
@@ -45,12 +47,15 @@ int server_main(int argc, char** argv)
     setenv("OS_ACTIVITY_DT_MODE", "NO", true);
 #endif
 
+    // Initialize platform abstraction layer and core services
     Arch arch;
     arch.init();
 
+    // Logging and event dispatch infrastructure
     Log log;
     EventQueue events;
 
+    // Launch the main server application which manages client connections
     ServerApp app(&events, createTaskBarReceiver);
     int result = app.run(argc, argv);
 #if SYSAPI_WIN32
@@ -66,5 +71,7 @@ int server_main(int argc, char** argv)
 
 int main(int argc, char** argv)
 {
+    // Delegate to the namespaced server entry point to avoid polluting the
+    // global namespace and to keep parity with the client/daemon binaries.
     return inputleap::server_main(argc, argv);
 }

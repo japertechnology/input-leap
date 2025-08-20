@@ -1,9 +1,17 @@
+# Root marker indicating this is the top-most EditorConfig file for the project
 root = true
 
+# Apply the following settings to all files
 [*]
+# Use Unix style line endings for cross-platform consistency
 end_of_line = lf
+# Enforce UTF-8 file encoding
 charset = utf-8
+# Automatically remove trailing spaces on save
 trim_trailing_whitespace = true
+# Ensure files end with a newline character
 insert_final_newline = true
+# Use spaces rather than tabs for indentation
 indent_style = space
+# Default indentation width of four spaces
 indent_size = 4
