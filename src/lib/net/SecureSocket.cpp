@@ -31,6 +31,7 @@
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <openssl/x509_vfy.h>
 #include <cstring>
 #include <cstdlib>
 #include <memory>
@@ -354,9 +355,15 @@ bool SecureSocket::load_certificates(const inputleap::fs::path& path)
     return true;
 }
 
-static int cert_verify_ignore_callback(X509_STORE_CTX*, void*)
+static int cert_verify_callback(X509_STORE_CTX* ctx, void*)
 {
-    return 1;
+    int result = X509_verify_cert(ctx);
+    if (result <= 0) {
+        int err = X509_STORE_CTX_get_error(ctx);
+        LOG_ERR("certificate verification failed: %s",
+                X509_verify_cert_error_string(err));
+    }
+    return result;
 }
 
 void
@@ -398,11 +405,11 @@ SecureSocket::initContext(bool server)
     }
 
     if (security_level_ == ConnectionSecurityLevel::ENCRYPTED_AUTHENTICATED) {
-        // We want to ask for peer certificate, but not verify it. If we don't ask for peer
-        // certificate, e.g. client won't send it.
+        // Require and verify the peer certificate. If no certificate is provided or the
+        // certificate chain cannot be validated, the connection will fail.
         SSL_CTX_set_verify(m_ssl->m_context, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
                            nullptr);
-        SSL_CTX_set_cert_verify_callback(m_ssl->m_context, cert_verify_ignore_callback, nullptr);
+        SSL_CTX_set_cert_verify_callback(m_ssl->m_context, cert_verify_callback, nullptr);
     }
 }
 
