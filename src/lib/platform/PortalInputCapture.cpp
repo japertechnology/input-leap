@@ -23,6 +23,7 @@
 
 #include <sys/un.h> // for EIS fd hack, remove
 #include <sys/socket.h> // for EIS fd hack, remove
+#include <unistd.h> // for close
 
 namespace inputleap {
 
@@ -111,6 +112,8 @@ int PortalInputCapture::fake_eis_fd()
     auto result = connect(fd, (struct sockaddr*)&addr, sizeof(addr));
     if (result != 0) {
         LOG_DEBUG("Faked EIS fd failed: %s", strerror(errno));
+        close(fd);
+        return -1;
     }
 
     return sock;
