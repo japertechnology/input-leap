@@ -24,6 +24,8 @@
 #include <sys/un.h> // for EIS fd hack, remove
 #include <sys/socket.h> // for EIS fd hack, remove
 #include <unistd.h> // for close
+#include <cerrno> // for errno
+#include <cstring> // for strerror
 
 namespace inputleap {
 
@@ -98,25 +100,23 @@ int PortalInputCapture::fake_eis_fd()
         return -1;
     }
 
-    auto sock = socket(AF_UNIX, SOCK_STREAM|SOCK_NONBLOCK, 0);
+    int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
 
     // Dealing with the socket directly because nothing in lib/... supports
     // AF_UNIX and I'm too lazy to fix all this for a temporary hack
-    int fd = sock;
     struct sockaddr_un addr = {
         .sun_family = AF_UNIX,
         .sun_path = {0},
     };
     std::snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", path);
 
-    auto result = connect(fd, (struct sockaddr*)&addr, sizeof(addr));
-    if (result != 0) {
+    if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
         LOG_DEBUG("Faked EIS fd failed: %s", strerror(errno));
         close(fd);
         return -1;
     }
 
-    return sock;
+    return fd;
 }
 
 void PortalInputCapture::cb_session_closed(XdpSession* session)
