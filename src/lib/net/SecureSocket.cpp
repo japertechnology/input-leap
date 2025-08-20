@@ -32,11 +32,13 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <openssl/x509_vfy.h>
+#include <openssl/bio.h>
 #include <cstring>
 #include <cstdlib>
 #include <memory>
 #include <fstream>
 #include <memory>
+#include <string>
 
 namespace inputleap {
 
@@ -676,8 +678,29 @@ bool SecureSocket::verify_peer_certificate(const inputleap::fs::path& fingerprin
     }
     auto cert_free = inputleap::finally([cert]() { X509_free(cert); });
     char* line = X509_NAME_oneline(X509_get_subject_name(cert), nullptr, 0);
-    LOG_INFO("peer ssl certificate info: %s", line);
-    OPENSSL_free(line);
+    if (line != nullptr) {
+        LOG_INFO("peer ssl certificate info: %s", line);
+        OPENSSL_free(line);
+    } else {
+        BIO* bio = BIO_new(BIO_s_mem());
+        if (bio != nullptr) {
+            if (X509_NAME_print_ex(bio, X509_get_subject_name(cert), 0, XN_FLAG_RFC2253) >= 0) {
+                char* data = nullptr;
+                long len = BIO_get_mem_data(bio, &data);
+                if (len > 0 && data != nullptr) {
+                    std::string name(data, static_cast<std::size_t>(len));
+                    LOG_INFO("peer ssl certificate info: %s", name.c_str());
+                } else {
+                    LOG_INFO("peer ssl certificate info: <subject unavailable>");
+                }
+            } else {
+                LOG_INFO("peer ssl certificate info: <subject unavailable>");
+            }
+            BIO_free(bio);
+        } else {
+            LOG_INFO("peer ssl certificate info: <subject unavailable>");
+        }
+    }
 
     // calculate received certificate fingerprint
     inputleap::FingerprintData fingerprint_sha1, fingerprint_sha256;
