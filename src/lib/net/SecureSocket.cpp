@@ -387,20 +387,21 @@ SecureSocket::initContext(bool server)
         showSecureLibInfo();
     }
 
-    // SSLv23_method uses TLSv1, with the ability to fall back to SSLv3
     if (server) {
-        method = SSLv23_server_method();
+        method = TLS_server_method();
     }
     else {
-        method = SSLv23_client_method();
+        method = TLS_client_method();
     }
 
     // create new context from method
     SSL_METHOD* m = const_cast<SSL_METHOD*>(method);
     m_ssl->m_context = SSL_CTX_new(m);
 
-    // drop SSLv3 support
-    SSL_CTX_set_options(m_ssl->m_context, SSL_OP_NO_SSLv3);
+    // enforce TLS 1.2+ and drop older protocols
+    SSL_CTX_set_min_proto_version(m_ssl->m_context, TLS1_2_VERSION);
+    SSL_CTX_set_options(m_ssl->m_context,
+                        SSL_OP_NO_SSLv3 | SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1);
 
     if (m_ssl->m_context == nullptr) {
         showError("");
