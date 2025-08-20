@@ -20,7 +20,7 @@ def get_all_workflow_artifacts(s, run_id):
 
 def find_by_re(items, regex):
     for i in items:
-        if re.match(regex, i) is not None:
+        if re.search(regex, i) is not None:
             return i
     return None
 
