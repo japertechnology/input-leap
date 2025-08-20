@@ -194,9 +194,8 @@ void ClientListener::handle_client_disconnected(ClientProxy* client)
     for (auto i = m_waitingClients.begin(), n = m_waitingClients.end(); i != n; ++i) {
         if (*i == client) {
             m_waitingClients.erase(i);
-            m_events->remove_handler(EventType::CLIENT_PROXY_DISCONNECTED, client);
-
-            // FIXME: there are multiple dangling pointers in handlers left for the socket
+            // remove any handlers associated with the client before deleting it
+            m_events->remove_handlers(client);
             delete client;
             break;
         }
