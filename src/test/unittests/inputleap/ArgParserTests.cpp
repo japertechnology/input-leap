@@ -17,6 +17,9 @@
 
 #include "inputleap/ArgParser.h"
 #include "inputleap/ArgsBase.h"
+#if WINAPI_MSWINDOWS
+#include "common/win32/encoding_utilities.h"
+#endif
 
 #include <gtest/gtest.h>
 
@@ -238,5 +241,20 @@ TEST(ArgParserTests, removeDoubleQuotes_singleDoubleQuote_noChange)
 
     EXPECT_EQ("\"", arg);
 }
+
+#if WINAPI_MSWINDOWS
+TEST(ArgParserTests, parseUnicodeArgs)
+{
+    const wchar_t* argv[] = {L"stub", L"--name", L"\x65e5\x672c"};
+    Argv a(3, argv);
+
+    const char* optarg = nullptr;
+    auto result = a.shift("--name", nullptr, &optarg);
+
+    std::string expected = win_wchar_to_utf8(L"\x65e5\x672c");
+    EXPECT_STREQ("--name", result);
+    EXPECT_STREQ(expected.c_str(), optarg);
+}
+#endif
 
 } // namespace inputleap
