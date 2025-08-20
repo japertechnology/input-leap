@@ -45,30 +45,35 @@ void DragInformation::parseDragInfo(DragFileList& dragFileList, std::uint32_t fi
     std::uint32_t index = 0;
     while (index < fileNum) {
         findResult1 = data.find(',', startPos);
-        findResult2 = data.find_last_of(slash, findResult1);
-
-        if (findResult1 == startPos) {
-            //TODO: file number does not match, something goes wrong
+        if (findResult1 == std::string::npos || findResult1 == startPos) {
+            // malformed input or file number does not match
             break;
         }
 
+        findResult2 = data.find_last_of(slash, findResult1);
+        size_t filenameStart = (findResult2 == std::string::npos) ? 0 : findResult2 + 1;
+
         // set filename
-        if (findResult1 - findResult2 > 1) {
-            auto filename = data.substr(findResult2 + 1, findResult1 - findResult2 - 1);
+        if (findResult1 > filenameStart) {
+            auto filename = data.substr(filenameStart, findResult1 - filenameStart);
             DragInformation di;
             di.setFilename(filename);
             dragFileList.push_back(di);
         }
         startPos = findResult1 + 1;
 
-        //set filesize
+        // set filesize
         findResult2 = data.find(',', startPos);
-        if (findResult2 - findResult1 > 1) {
-            auto filesize = data.substr(findResult1 + 1, findResult2 - findResult1 - 1);
+        if (findResult2 == std::string::npos) {
+            // malformed input
+            break;
+        }
+        if (findResult2 > startPos) {
+            auto filesize = data.substr(startPos, findResult2 - startPos);
             size_t size = stringToNum(filesize);
             dragFileList.at(index).setFilesize(size);
         }
-        startPos = findResult1 + 1;
+        startPos = findResult2 + 1;
 
         ++index;
     }
