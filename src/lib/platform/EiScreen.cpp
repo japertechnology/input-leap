@@ -200,9 +200,10 @@ void EiScreen::warpCursor(int32_t x, int32_t y)
 std::uint32_t EiScreen::registerHotKey(KeyID key, KeyModifierMask mask)
 {
     static std::uint32_t next_id;
-    std::uint32_t id = std::min(++next_id, 1u);
-
-    // Bug: id rollover means duplicate hotkey ids. Oh well.
+    if (++next_id == 0) {
+        next_id = 1;
+    }
+    std::uint32_t id = next_id;
 
     auto set = hotkeys_.find(key);
     if (set == hotkeys_.end()) {
