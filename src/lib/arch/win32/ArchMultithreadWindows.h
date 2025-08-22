@@ -59,7 +59,7 @@ public:
     virtual ArchThread copyThread(ArchThread);
     virtual void closeThread(ArchThread);
     virtual void cancelThread(ArchThread);
-    virtual void setPriorityOfThread(ArchThread, int n);
+    virtual bool setPriorityOfThread(ArchThread, int n) override;
     virtual void testCancelThread();
     virtual bool wait(ArchThread, double timeout);
     virtual bool isSameThread(ArchThread, ArchThread);

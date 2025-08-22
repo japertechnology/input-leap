@@ -123,7 +123,7 @@ public:
     the next lower, etc.  -1 is the next higher, etc. but boosting
     the priority may not be permitted and will be silently ignored.
     */
-    void setPriority(int n);
+    bool setPriority(int n);
 
     //! Force pollSocket() to return
     /*!

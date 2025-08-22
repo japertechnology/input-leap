@@ -138,7 +138,8 @@ public:
     the thread has a lower priority and if negative a higher priority.
     Some architectures may not support either or both directions.
     */
-    virtual void setPriorityOfThread(ArchThread, int n) = 0;
+    // returns true on success, false if unsupported or on failure
+    virtual bool setPriorityOfThread(ArchThread, int n) = 0;
 
     //! Cancellation point
     /*!

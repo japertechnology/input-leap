@@ -57,7 +57,7 @@ public:
     ArchThread copyThread(ArchThread) override;
     void closeThread(ArchThread) override;
     void cancelThread(ArchThread) override;
-    void setPriorityOfThread(ArchThread, int n) override;
+    bool setPriorityOfThread(ArchThread, int n) override;
     void testCancelThread() override;
     bool wait(ArchThread, double timeout) override;
     bool isSameThread(ArchThread, ArchThread) override;

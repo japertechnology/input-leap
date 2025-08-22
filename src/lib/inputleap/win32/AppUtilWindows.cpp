@@ -145,7 +145,9 @@ AppUtilWindows::run(int argc, char** argv)
     ArchMiscWindows::setInstanceWin32(GetModuleHandle(nullptr));
 
     MSWindowsScreen::init(ArchMiscWindows::instanceWin32());
-    Thread::getCurrentThread().setPriority(-14);
+    if (!Thread::getCurrentThread().setPriority(-14)) {
+        LOG_DEBUG1("failed to set thread priority");
+    }
 
     StartupFunc startup;
     if (ArchMiscWindows::wasLaunchedAsService()) {
