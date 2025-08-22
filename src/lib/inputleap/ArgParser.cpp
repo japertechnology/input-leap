@@ -449,12 +449,12 @@ ArgParser::parseGenericArgs(Argv& argv)
         argsBase().m_enableIpc = true;
     }
     else if (argv.shift("--server")) {
-        // HACK: stop error happening when using portable app.
-        // FIXME: there is no portable InputLeap
+        throw XArgvParserError(
+            "portable mode (--server) is not supported; use input-leaps for server functionality");
     }
     else if (argv.shift("--client")) {
-        // HACK: stop error happening when using portable app.
-        // FIXME: there is no portable InputLeap.
+        throw XArgvParserError(
+            "portable mode (--client) is not supported; use input-leapc for client functionality");
     }
     else if (argv.shift("--enable-drag-drop")) {
         bool useDragDrop = true;
