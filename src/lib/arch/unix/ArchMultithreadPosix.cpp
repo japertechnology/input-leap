@@ -21,6 +21,7 @@
 #include "arch/Arch.h"
 #include "arch/XArch.h"
 #include "base/Time.h"
+#include "base/Log.h"
 
 #include <signal.h>
 #include <sys/time.h>
@@ -28,6 +29,8 @@
 #include <cerrno>
 #include <csignal>
 #include <fstream>
+#include <sched.h>
+#include <cstring>
 
 #define SIGWAKEUP SIGUSR1
 
@@ -292,12 +295,43 @@ ArchMultithreadPosix::cancelThread(ArchThread thread)
     }
 }
 
-void
-ArchMultithreadPosix::setPriorityOfThread(ArchThread thread, int /*n*/)
+bool
+ArchMultithreadPosix::setPriorityOfThread(ArchThread thread, int n)
 {
     assert(thread != nullptr);
 
-    // FIXME
+    int policy;
+    struct sched_param param;
+    int status = pthread_getschedparam(thread->m_thread, &policy, &param);
+    if (status != 0) {
+        LOG_DEBUG1("pthread_getschedparam failed: %s", std::strerror(status));
+        return false;
+    }
+
+    int min = sched_get_priority_min(policy);
+    int max = sched_get_priority_max(policy);
+    if (min == -1 || max == -1 || min == max) {
+        // policy doesn't support changing priorities
+        LOG_DEBUG1("thread policy %d does not support priorities", policy);
+        return false;
+    }
+
+    int newPriority = param.sched_priority - n;
+    if (newPriority < min) {
+        newPriority = min;
+    }
+    else if (newPriority > max) {
+        newPriority = max;
+    }
+
+    param.sched_priority = newPriority;
+    status = pthread_setschedparam(thread->m_thread, policy, &param);
+    if (status != 0) {
+        LOG_DEBUG1("pthread_setschedparam failed: %s", std::strerror(status));
+        return false;
+    }
+
+    return true;
 }
 
 void
@@ -536,7 +570,9 @@ void
 ArchMultithreadPosix::doThreadFunc(ArchThread thread)
 {
     // default priority is slightly below normal
-    setPriorityOfThread(thread, 1);
+    if (!setPriorityOfThread(thread, 1)) {
+        LOG_DEBUG1("failed to set default thread priority");
+    }
 
     // wait for parent to initialize this object
     {

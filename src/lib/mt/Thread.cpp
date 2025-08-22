@@ -74,10 +74,10 @@ Thread::cancel()
     ARCH->cancelThread(m_thread);
 }
 
-void
+bool
 Thread::setPriority(int n)
 {
-    ARCH->setPriorityOfThread(m_thread, n);
+    return ARCH->setPriorityOfThread(m_thread, n);
 }
 
 void

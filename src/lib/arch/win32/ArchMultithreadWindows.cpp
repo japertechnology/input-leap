@@ -23,6 +23,7 @@
 #include "arch/win32/ArchMultithreadWindows.h"
 #include "arch/Arch.h"
 #include "arch/XArch.h"
+#include "base/Log.h"
 
 #include <process.h>
 
@@ -214,7 +215,7 @@ ArchMultithreadWindows::cancelThread(ArchThread thread)
     SetEvent(thread->m_cancel);
 }
 
-void
+bool
 ArchMultithreadWindows::setPriorityOfThread(ArchThread thread, int n)
 {
     struct PriorityInfo {
@@ -269,8 +270,13 @@ ArchMultithreadWindows::setPriorityOfThread(ArchThread thread, int n)
             index = s_pMax;
         }
     }
-    SetPriorityClass(GetCurrentProcess(), s_pClass[index].m_class);
-    SetThreadPriority(thread->m_thread, s_pClass[index].m_level);
+    BOOL ok1 = SetPriorityClass(GetCurrentProcess(), s_pClass[index].m_class);
+    BOOL ok2 = SetThreadPriority(thread->m_thread, s_pClass[index].m_level);
+    if (!ok1 || !ok2) {
+        LOG_DEBUG1("failed to set thread priority");
+        return false;
+    }
+    return true;
 }
 
 void
