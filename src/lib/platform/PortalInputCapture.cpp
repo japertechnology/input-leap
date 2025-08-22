@@ -26,6 +26,8 @@
 #include <unistd.h> // for close
 #include <cerrno> // for errno
 #include <cstring> // for strerror
+#include <algorithm>
+#include <string>
 
 namespace inputleap {
 
@@ -117,6 +119,40 @@ int PortalInputCapture::fake_eis_fd()
     }
 
     return fd;
+}
+
+bool PortalInputCapture::is_transient_disable(GVariant* options, std::string& reason)
+{
+    reason.clear();
+    bool transient = false;
+
+    if (options) {
+        GVariantIter iter;
+        const gchar* key;
+        GVariant* value;
+        g_variant_iter_init(&iter, options);
+        while (g_variant_iter_next(&iter, "{&sv}", &key, &value)) {
+            g_autofree gchar* val = g_variant_print(value, true);
+            LOG_DEBUG("disable option %s=%s", key, val);
+            if (std::strcmp(key, "reason") == 0 || std::strcmp(key, "error") == 0) {
+                const char* str = g_variant_get_string(value, nullptr);
+                reason = str ? str : "";
+                if (g_strcmp0(str, "timeout") == 0 || g_strcmp0(str, "error") == 0)
+                    transient = true;
+            }
+            g_variant_unref(value);
+        }
+    }
+
+    return transient;
+}
+
+unsigned int PortalInputCapture::next_backoff(unsigned int current_ms)
+{
+    const unsigned int kMaxDelay = 60000; // 60 seconds
+    if (current_ms == 0)
+        return 1000;
+    return std::min(current_ms * 2, kMaxDelay);
 }
 
 void PortalInputCapture::cb_session_closed(XdpSession* session)
@@ -274,16 +310,22 @@ void PortalInputCapture::cb_disabled(XdpInputCaptureSession* session, GVariant* 
     enabled_ = false;
     is_active_ = false;
 
-    // FIXME: need some better heuristics here of when we want to enable again
-    // But we don't know *why* we got disabled (and it's doubtfull we ever will), so
-    // we just assume that the zones will change or something and we can re-enable again
-    // ... very soon
-    g_timeout_add(1000,
-                  [](gpointer data) -> gboolean {
-                      reinterpret_cast<PortalInputCapture*>(data)->enable();
-                  return false;
-                  },
-                  this);
+    std::string reason;
+    bool transient = is_transient_disable(options, reason);
+
+    if (transient) {
+        LOG_DEBUG("Input capture disabled (%s); retrying in %u ms", reason.c_str(), reenable_delay_ms_);
+        g_timeout_add(reenable_delay_ms_,
+                      [](gpointer data) -> gboolean {
+                          reinterpret_cast<PortalInputCapture*>(data)->enable();
+                          return G_SOURCE_REMOVE;
+                      },
+                      this);
+        reenable_delay_ms_ = next_backoff(reenable_delay_ms_);
+    }
+    else {
+        LOG_INFO("Input capture disabled (%s); waiting for user action", reason.empty() ? "unknown" : reason.c_str());
+    }
 }
 
 void PortalInputCapture::cb_activated(XdpInputCaptureSession* session, std::uint32_t activation_id,
@@ -304,6 +346,7 @@ void PortalInputCapture::cb_activated(XdpInputCaptureSession* session, std::uint
     }
     activation_id_ = activation_id;
     is_active_ = true;
+    reenable_delay_ms_ = 1000;
 }
 
 void PortalInputCapture::cb_deactivated(XdpInputCaptureSession* session,

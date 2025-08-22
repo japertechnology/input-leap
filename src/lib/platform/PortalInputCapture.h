@@ -26,6 +26,7 @@
 #include <glib.h>
 #include <libportal/portal.h>
 #include <libportal/inputcapture.h>
+#include <string>
 
 namespace inputleap {
 
@@ -52,6 +53,9 @@ private:
     void cb_deactivated(XdpInputCaptureSession* session, std::uint32_t activation_id,
                         GVariant* options);
     void cb_zones_changed(XdpInputCaptureSession *session, GVariant *options);
+
+    static bool is_transient_disable(GVariant* options, std::string& reason);
+    static unsigned int next_backoff(unsigned int current_ms);
 
     /// g_signal_connect callback wrapper
     static void cb_session_closed_cb(XdpSession* session, gpointer data)
@@ -98,6 +102,7 @@ private:
     std::uint32_t activation_id_ = 0;
 
     std::vector<XdpInputCapturePointerBarrier*> barriers_;
+    unsigned int reenable_delay_ms_ = 1000;
 };
 
 } // namespace inputleap

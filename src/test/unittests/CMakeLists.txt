@@ -45,10 +45,12 @@ endif()
 if (BUILD_XWINDOWS)
     file(GLOB xwin_sources "platform/XWindows*.cpp")
     file(GLOB xwin_headers "platform/XWindows*.h")
+    file(GLOB portal_sources "platform/Portal*.cpp")
+    file(GLOB portal_headers "platform/Portal*.h")
 endif()
 
-list(APPEND sources ${mswin_sources} ${carbon_sources} ${xwin_sources})
-list(APPEND headers ${mswin_headers} ${carbon_headers} ${xwin_headers})
+list(APPEND sources ${mswin_sources} ${carbon_sources} ${xwin_sources} ${portal_sources})
+list(APPEND headers ${mswin_headers} ${carbon_headers} ${xwin_headers} ${portal_headers})
 
 include_directories(
     ../../
