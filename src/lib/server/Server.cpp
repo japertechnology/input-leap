@@ -1790,17 +1790,18 @@ Server::sendDragInfo(BaseClientProxy* newScreen)
     std::string infoString;
     std::uint32_t fileCount = DragInformation::setupDragInfo(m_dragFileList, infoString);
 
-	if (fileCount > 0) {
-		char* info = nullptr;
-		size_t size = infoString.size();
-		info = new char[size];
-		memcpy(info, infoString.c_str(), size);
+    if (fileCount > 0) {
+        size_t size = infoString.size();
+        char* info = new char[size + 1];
+        memcpy(info, infoString.c_str(), size);
+        info[size] = '\0';
 
-		LOG_DEBUG2("sending drag information to client");
-		LOG_DEBUG3("dragging file list: %s", info);
-		LOG_DEBUG3("dragging file list string size: %zi", size);
-		newScreen->sendDragInfo(fileCount, info, size);
-	}
+        LOG_DEBUG2("sending drag information to client");
+        LOG_DEBUG3("dragging file list: %s", info);
+        LOG_DEBUG3("dragging file list string size: %zi", size);
+        newScreen->sendDragInfo(fileCount, info, size);
+        delete[] info;
+    }
 }
 
 void Server::onMouseMoveSecondary(std::int32_t dx, std::int32_t dy)
