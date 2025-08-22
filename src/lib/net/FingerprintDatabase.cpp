@@ -54,7 +54,9 @@ void FingerprintDatabase::read_stream(std::istream& stream)
             continue;
         }
 
-        fingerprints_.push_back(fingerprint);
+        // Avoid inserting duplicate fingerprints if read_stream is called
+        // multiple times with the same data.
+        add_trusted(fingerprint);
     }
 }
 
