@@ -1,0 +1,1 @@
+Add explicit error messages for the `--server` and `--client` flags when portable mode is requested.
