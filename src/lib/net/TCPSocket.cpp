@@ -143,7 +143,9 @@ std::uint32_t TCPSocket::read(void* buffer, std::uint32_t n)
     // if no more data and we cannot read or write then send disconnected
     if (n > 0 && m_inputBuffer.getSize() == 0 && !m_readable && !m_writable) {
         sendEvent(EventType::SOCKET_DISCONNECTED);
-        m_connected = false;
+        onDisconnected();
+        // onDisconnected() clears buffers and flags before marking the socket
+        // as disconnected
     }
 
     return n;
