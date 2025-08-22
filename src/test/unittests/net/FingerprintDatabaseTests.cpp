@@ -92,4 +92,17 @@ TEST(FingerprintDatabase, is_trusted)
     ASSERT_FALSE(db.is_trusted({ "algo1", { 1, 2, 3, 4, 0xac } }));
 }
 
+TEST(FingerprintDatabase, repeated_reads_do_not_duplicate)
+{
+    std::istringstream stream1("v2:algo1:01020304ab\n");
+    FingerprintDatabase db;
+    db.read_stream(stream1);
+
+    // Read the same fingerprint again to ensure it isn't added twice.
+    std::istringstream stream2("v2:algo1:01020304ab\n");
+    db.read_stream(stream2);
+
+    ASSERT_EQ(db.fingerprints().size(), 1u);
+}
+
 } // namespace inputleap
