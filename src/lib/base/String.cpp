@@ -176,13 +176,26 @@ sprintf(const char* fmt, ...)
         int n = std::vsnprintf(buffer, len, fmt, args);
         va_end(args);
 
-        // if the buffer wasn't big enough then make it bigger and try again
-        if (n < 0 || n > len) {
-            if (buffer != tmp) {
-                delete[] buffer;
+        // vsnprintf returns the number of characters that would have been
+        // written (not including the NUL terminator). A negative value means
+        // an encoding error. If the return value is >= len then the output was
+        // truncated and we need a larger buffer.
+        if (n < 0 || n >= len) {
+            if (n < 0) {
+                // abort on encoding errors
+                result.clear();
+                if (buffer != tmp) {
+                    delete[] buffer;
+                }
+                buffer = nullptr;
             }
-            len   *= 2;
-            buffer = new char[len];
+            else {
+                if (buffer != tmp) {
+                    delete[] buffer;
+                }
+                len *= 2;
+                buffer = new char[len];
+            }
         }
 
         // if it was big enough then save the string and don't try again
