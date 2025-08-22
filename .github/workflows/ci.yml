@@ -1,0 +1,46 @@
+name: Lint and Test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install clang-format
+        run: sudo apt-get update && sudo apt-get install -y clang-format
+      - name: Run clang-format
+        env:
+          BASE_REF: ${{ github.base_ref || github.ref_name }}
+        run: |
+          git fetch origin $BASE_REF
+          files=$(git diff --name-only origin/$BASE_REF...HEAD | grep -E '\.(c|cc|cpp|h|hpp)$' || true)
+          if [ -n "$files" ]; then
+            clang-format --dry-run --Werror $files
+          else
+            echo "No C/C++ source changes to check."
+          fi
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config \
+            libavahi-compat-libdnssd-dev libgl-dev libice-dev libsm-dev libssl-dev \
+            libxinerama-dev libxrandr-dev libxtst-dev libxkbcommon-dev libglib2.0-dev \
+            xvfb
+      - name: Configure
+        run: cmake -S . -B build -GNinja -DINPUTLEAP_BUILD_GUI=OFF -DINPUTLEAP_BUILD_LIBEI=OFF
+      - name: Build
+        run: cmake --build build -j2
+      - name: Test
+        run: xvfb-run -a ctest --test-dir build --output-on-failure
