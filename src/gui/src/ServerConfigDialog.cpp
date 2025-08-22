@@ -137,7 +137,18 @@ void ServerConfigDialog::on_m_pButtonRemoveHotkey_clicked()
     Q_ASSERT(idx >= 0 && idx < static_cast<int>(serverConfig().hotkeys().size()));
     serverConfig().hotkeys().erase(serverConfig().hotkeys().begin() + idx);
     ui_->m_pListActions->clear();
-    delete ui_->m_pListHotkeys->item(idx);
+    ui_->m_pListHotkeys->blockSignals(true);
+    delete ui_->m_pListHotkeys->takeItem(idx);
+
+    int count = ui_->m_pListHotkeys->count();
+    if (count > 0)
+    {
+        if (idx >= count)
+            idx = count - 1;
+        ui_->m_pListHotkeys->setCurrentRow(idx);
+    }
+    ui_->m_pListHotkeys->blockSignals(false);
+    on_m_pListHotkeys_itemSelectionChanged();
 }
 
 void ServerConfigDialog::on_m_pListHotkeys_itemSelectionChanged()
@@ -152,14 +163,6 @@ void ServerConfigDialog::on_m_pListHotkeys_itemSelectionChanged()
         ui_->m_pListActions->clear();
 
         int idx = ui_->m_pListHotkeys->row(ui_->m_pListHotkeys->selectedItems()[0]);
-
-        // There's a bug somewhere around here: We get idx == 1 right after we deleted the next to last item, so idx can
-        // only possibly be 0. GDB shows we got called indirectly from the delete line in
-        // on_m_pButtonRemoveHotkey_clicked() above, but the delete is of course necessary and seems correct.
-        // The while() is a generalized workaround for all that and shouldn't be required.
-        while (idx >= 0 && idx >= static_cast<int>(serverConfig().hotkeys().size()))
-            idx--;
-
         Q_ASSERT(idx >= 0 && idx < static_cast<int>(serverConfig().hotkeys().size()));
 
         const Hotkey& hotkey = serverConfig().hotkeys()[idx];
