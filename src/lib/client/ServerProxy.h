@@ -18,12 +18,13 @@
 
 #pragma once
 
-#include "inputleap/clipboard_types.h"
-#include "inputleap/key_types.h"
-#include "inputleap/Fwd.h"
-#include "base/Fwd.h"
 #include "base/Event.h"
 #include "base/EventTarget.h"
+#include "base/Fwd.h"
+#include "inputleap/Fwd.h"
+#include "inputleap/clipboard_types.h"
+#include "inputleap/key_types.h"
+#include <string>
 
 namespace inputleap {
 
@@ -36,8 +37,9 @@ class IStream;
 This class acts a proxy for the server, converting calls into messages
 to the server and messages from the server to calls on the client.
 */
-class ServerProxy : public EventTarget {
-public:
+class ServerProxy : public EventTarget
+{
+  public:
     /*!
     Process messages from the server on \p stream and forward to
     \p client.
@@ -64,12 +66,17 @@ public:
     void handleDataForTest() { handleData(Event(), nullptr); }
 #endif
 
-protected:
-    enum EResult { kOkay, kUnknown, kDisconnect };
+  protected:
+    enum EResult
+    {
+        kOkay,
+        kUnknown,
+        kDisconnect
+    };
     EResult parseHandshakeMessage(const std::uint8_t* code);
     EResult parseMessage(const std::uint8_t* code);
 
-private:
+  private:
     // if compressing mouse motion then send the last motion now
     void flushCompressedMouse();
 
@@ -108,7 +115,7 @@ private:
     void dragInfoReceived();
     void handle_clipboard_sending_event(const Event&);
 
-private:
+  private:
     typedef EResult (ServerProxy::*MessageParser)(const std::uint8_t*);
 
     Client* m_client;
@@ -130,6 +137,9 @@ private:
 
     MessageParser m_parser;
     IEventQueue* m_events;
+    std::string m_disconnectReason;
+
+    void disconnect(const char* reason);
 };
 
 } // namespace inputleap
