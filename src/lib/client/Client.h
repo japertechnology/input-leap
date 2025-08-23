@@ -18,17 +18,18 @@
 
 #pragma once
 
-#include "base/Fwd.h"
 #include "base/EventTarget.h"
-#include "inputleap/Fwd.h"
-#include "inputleap/IClient.h"
+#include "base/EventTypes.h"
+#include "base/Fwd.h"
+#include "inputleap/ClientArgs.h"
 #include "inputleap/Clipboard.h"
 #include "inputleap/DragInformation.h"
+#include "inputleap/Fwd.h"
+#include "inputleap/IClient.h"
 #include "inputleap/INode.h"
-#include "inputleap/ClientArgs.h"
 #include "net/Fwd.h"
 #include "net/NetworkAddress.h"
-#include "base/EventTypes.h"
+#include <memory>
 
 namespace inputleap {
 
@@ -37,24 +38,36 @@ class IStream;
 class Thread;
 
 /// This class implements the top-level client algorithms for InputLeap.
-class Client : public IClient, public INode, public EventTarget {
-public:
-    class FailInfo {
-    public:
-        FailInfo(const char* what) : m_retry(false), m_what(what) { }
+class Client
+  : public IClient
+  , public INode
+  , public EventTarget
+{
+  public:
+    class FailInfo
+    {
+      public:
+        FailInfo(const char* what)
+          : m_retry(false)
+          , m_what(what)
+        {
+        }
         bool m_retry;
         std::string m_what;
     };
 
-public:
+  public:
     /*!
     This client will attempt to connect to the server using \p name
     as its name and \p address as the server's address and \p factory
     to create the socket.  \p screen is    the local screen.
     */
-    Client(IEventQueue* events, const std::string& name,
-           const NetworkAddress& address, ISocketFactory* socketFactory,
-           inputleap::Screen* screen, ClientArgs const& args);
+    Client(IEventQueue* events,
+           const std::string& name,
+           const NetworkAddress& address,
+           ISocketFactory* socketFactory,
+           inputleap::Screen* screen,
+           ClientArgs const& args);
 
     ~Client();
 
@@ -88,7 +101,6 @@ public:
 
     //! Send dragging file information back to server
     void sendDragInfo(std::uint32_t fileCount, std::string& info, size_t size);
-
 
     //@}
     //! @name accessors
@@ -131,12 +143,17 @@ public:
     // IScreen overrides
     const EventTarget* get_event_target() const override;
     bool getClipboard(ClipboardID id, IClipboard*) const override;
-    void getShape(std::int32_t& x, std::int32_t& y, std::int32_t& width,
+    void getShape(std::int32_t& x,
+                  std::int32_t& y,
+                  std::int32_t& width,
                   std::int32_t& height) const override;
     void getCursorPos(std::int32_t& x, std::int32_t& y) const override;
 
     // IClient overrides
-    void enter(std::int32_t xAbs, std::int32_t yAbs, std::uint32_t seqNum, KeyModifierMask mask,
+    void enter(std::int32_t xAbs,
+               std::int32_t yAbs,
+               std::uint32_t seqNum,
+               KeyModifierMask mask,
                bool forScreensaver) override;
     bool leave() override;
     void setClipboard(ClipboardID, const IClipboard*) override;
@@ -155,7 +172,7 @@ public:
     void setOptions(const OptionsList& options) override;
     virtual std::string getName() const override;
 
-private:
+  private:
     void sendClipboard(ClipboardID);
     void send_event(EventType);
     void sendConnectionFailedEvent(const char* msg);
@@ -187,10 +204,10 @@ private:
     void onFileReceiveCompleted();
     void sendClipboardThread(void*);
 
-public:
+  public:
     bool m_mock;
 
-private:
+  private:
     std::string m_name;
     NetworkAddress m_serverAddress;
     ISocketFactory* m_socketFactory;
@@ -211,8 +228,8 @@ private:
     std::string m_receivedFileData;
     DragFileList m_dragFileList;
     std::string m_dragFileExt;
-    Thread* m_sendFileThread;
-    Thread* m_writeToDropDirThread;
+    std::unique_ptr<Thread> m_sendFileThread;
+    std::unique_ptr<Thread> m_writeToDropDirThread;
     bool m_useSecureNetwork;
     ClientArgs m_args;
     bool m_enableClipboard;
