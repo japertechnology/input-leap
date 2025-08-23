@@ -20,6 +20,7 @@
 #include "arch/win32/ArchDaemonWindows.h"
 #include "base/Log.h"
 #include "common/Version.h"
+#include <stdexcept>
 
 #include <Wtsapi32.h>
 #pragma warning(disable: 4099)
@@ -177,10 +178,11 @@ ArchMiscWindows::closeKey(HKEY key)
 void
 ArchMiscWindows::deleteKey(HKEY key, const TCHAR* name)
 {
-    assert(key != nullptr);
-    assert(name != nullptr);
-    if (key == nullptr || name == nullptr) {
-        return;
+    if (key == nullptr) {
+        throw std::invalid_argument("Registry key is null");
+    }
+    if (name == nullptr) {
+        throw std::invalid_argument("Registry key name is null");
     }
     RegDeleteKey(key, name);
 }
@@ -188,9 +190,12 @@ ArchMiscWindows::deleteKey(HKEY key, const TCHAR* name)
 void
 ArchMiscWindows::deleteValue(HKEY key, const TCHAR* name)
 {
-    assert(key != nullptr);
-    assert(name != nullptr);
-    if (key==nullptr || name==nullptr) return;
+    if (key == nullptr) {
+        throw std::invalid_argument("Registry key is null");
+    }
+    if (name == nullptr) {
+        throw std::invalid_argument("Registry value name is null");
+    }
     RegDeleteValue(key, name);
 }
 
@@ -230,10 +235,11 @@ void
 ArchMiscWindows::setValue(HKEY key,
                 const TCHAR* name, const std::string& value)
 {
-    assert(key != nullptr);
     if (key == nullptr) {
-        // TODO: throw exception
-        return;
+        throw std::invalid_argument("Registry key is null");
+    }
+    if (name == nullptr) {
+        throw std::invalid_argument("Registry value name is null");
     }
     RegSetValueEx(key, name, 0, REG_SZ,
                                 reinterpret_cast<const BYTE*>(value.c_str()),
@@ -243,10 +249,11 @@ ArchMiscWindows::setValue(HKEY key,
 void
 ArchMiscWindows::setValue(HKEY key, const TCHAR* name, DWORD value)
 {
-    assert(key != nullptr);
     if (key == nullptr) {
-        // TODO: throw exception
-        return;
+        throw std::invalid_argument("Registry key is null");
+    }
+    if (name == nullptr) {
+        throw std::invalid_argument("Registry value name is null");
     }
     RegSetValueEx(key, name, 0, REG_DWORD,
                                 reinterpret_cast<CONST BYTE*>(&value),
@@ -257,11 +264,11 @@ void
 ArchMiscWindows::setValueBinary(HKEY key,
                 const TCHAR* name, const std::string& value)
 {
-    assert(key != nullptr);
-    assert(name != nullptr);
-    if (key == nullptr || name == nullptr) {
-        // TODO: throw exception
-        return;
+    if (key == nullptr) {
+        throw std::invalid_argument("Registry key is null");
+    }
+    if (name == nullptr) {
+        throw std::invalid_argument("Registry value name is null");
     }
     RegSetValueEx(key, name, 0, REG_BINARY,
                                 reinterpret_cast<const BYTE*>(value.data()),
