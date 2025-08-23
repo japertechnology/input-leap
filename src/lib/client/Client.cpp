@@ -18,75 +18,77 @@
 
 #include "client/Client.h"
 
+#include "arch/Arch.h"
+#include "base/EventQueueTimer.h"
+#include "base/IEventQueue.h"
+#include "base/Log.h"
+#include "base/Time.h"
 #include "client/ServerProxy.h"
-#include "inputleap/Screen.h"
-#include "inputleap/FileChunk.h"
 #include "inputleap/DropHelper.h"
+#include "inputleap/Exceptions.h"
+#include "inputleap/FileChunk.h"
+#include "inputleap/IPlatformScreen.h"
 #include "inputleap/PacketStreamFilter.h"
 #include "inputleap/ProtocolUtil.h"
-#include "inputleap/protocol_types.h"
-#include "inputleap/Exceptions.h"
+#include "inputleap/Screen.h"
 #include "inputleap/StreamChunker.h"
-#include "inputleap/IPlatformScreen.h"
+#include "inputleap/protocol_types.h"
 #include "mt/Thread.h"
-#include "net/TCPSocket.h"
 #include "net/IDataSocket.h"
 #include "net/ISocketFactory.h"
 #include "net/SecureSocket.h"
-#include "arch/Arch.h"
-#include "base/Log.h"
-#include "base/EventQueueTimer.h"
-#include "base/IEventQueue.h"
-#include "base/Time.h"
-
+#include "net/TCPSocket.h"
 
 #include <climits>
-#include <cstring>
 #include <cstdlib>
+#include <cstring>
+#include <fstream>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
-#include <fstream>
 
 namespace inputleap {
 
-Client::Client(IEventQueue* events, const std::string& name, const NetworkAddress& address,
+Client::Client(IEventQueue* events,
+               const std::string& name,
+               const NetworkAddress& address,
                ISocketFactory* socketFactory,
                inputleap::Screen* screen,
-               ClientArgs const& args) :
-    m_mock(false),
-    m_name(name),
-    m_serverAddress(address),
-    m_socketFactory(socketFactory),
-    m_screen(screen),
-    m_stream(nullptr),
-    m_timer(nullptr),
-    m_server(nullptr),
-    m_ready(false),
-    m_active(false),
-    m_suspended(false),
-    m_connectOnResume(false),
-    m_events(events),
-    m_sendFileThread(nullptr),
-    m_writeToDropDirThread(nullptr),
-    m_useSecureNetwork(args.m_enableCrypto),
-    m_args(args),
-    m_enableClipboard(true),
-    m_maximumClipboardSize(INT_MAX)
+               ClientArgs const& args)
+  : m_mock(false)
+  , m_name(name)
+  , m_serverAddress(address)
+  , m_socketFactory(socketFactory)
+  , m_screen(screen)
+  , m_stream(nullptr)
+  , m_timer(nullptr)
+  , m_server(nullptr)
+  , m_ready(false)
+  , m_active(false)
+  , m_suspended(false)
+  , m_connectOnResume(false)
+  , m_events(events)
+  , m_useSecureNetwork(args.m_enableCrypto)
+  , m_args(args)
+  , m_enableClipboard(true)
+  , m_maximumClipboardSize(INT_MAX)
 {
     assert(m_socketFactory != nullptr);
     assert(m_screen != nullptr);
 
     // register suspend/resume event handlers
-    m_events->add_handler(EventType::SCREEN_SUSPEND, get_event_target(),
-                          [this](const auto& e){ handle_suspend(); });
-    m_events->add_handler(EventType::SCREEN_RESUME, get_event_target(),
-                          [this](const auto& e){ handle_resume(); });
+    m_events->add_handler(
+      EventType::SCREEN_SUSPEND, get_event_target(), [this](const auto& e) { handle_suspend(); });
+    m_events->add_handler(
+      EventType::SCREEN_RESUME, get_event_target(), [this](const auto& e) { handle_resume(); });
 
     if (m_args.m_enableDragDrop) {
-        m_events->add_handler(EventType::FILE_CHUNK_SENDING, this,
-                              [this](const auto& e){ handle_file_chunk_sending(e); });
-        m_events->add_handler(EventType::FILE_RECEIVE_COMPLETED, this,
-                              [this](const auto& e){ handle_file_receive_completed(e); });
+        m_events->add_handler(EventType::FILE_CHUNK_SENDING, this, [this](const auto& e) {
+            handle_file_chunk_sending(e);
+        });
+        m_events->add_handler(EventType::FILE_RECEIVE_COMPLETED, this, [this](const auto& e) {
+            handle_file_receive_completed(e);
+        });
     }
 }
 
@@ -94,6 +96,20 @@ Client::~Client()
 {
     if (m_mock) {
         return;
+    }
+
+    // Ensure any outstanding file transfer threads have completed
+    if (m_sendFileThread) {
+        LOG_DEBUG("waiting for send-file thread to terminate");
+        m_sendFileThread->wait();
+        LOG_DEBUG("send-file thread terminated");
+        m_sendFileThread.reset();
+    }
+    if (m_writeToDropDirThread) {
+        LOG_DEBUG("waiting for drop-dir thread to terminate");
+        m_writeToDropDirThread->wait();
+        LOG_DEBUG("drop-dir thread terminated");
+        m_writeToDropDirThread.reset();
     }
 
     m_events->remove_handler(EventType::SCREEN_SUSPEND, get_event_target());
@@ -133,11 +149,11 @@ Client::connect()
 
         // m_serverAddress will be null if the hostname address is not reolved
         if (m_serverAddress.getAddress() != nullptr) {
-          // to help users troubleshoot, show server host name (issue: 60)
-          LOG_NOTE("connecting to '%s': %s:%i",
-          m_serverAddress.getHostname().c_str(),
-          ARCH->addrToString(m_serverAddress.getAddress()).c_str(),
-          m_serverAddress.getPort());
+            // to help users troubleshoot, show server host name (issue: 60)
+            LOG_NOTE("connecting to '%s': %s:%i",
+                     m_serverAddress.getHostname().c_str(),
+                     ARCH->addrToString(m_serverAddress.getAddress()).c_str(),
+                     m_serverAddress.getPort());
         }
 
         // create the socket
@@ -152,8 +168,7 @@ Client::connect()
         setupConnecting();
         setupTimer();
         socket_ptr->connect(m_serverAddress);
-    }
-    catch (XBase& e) {
+    } catch (XBase& e) {
         cleanupTimer();
         cleanupConnecting();
         cleanupStream();
@@ -173,8 +188,7 @@ Client::disconnect(const char* msg)
     cleanupConnection();
     if (msg != nullptr) {
         sendConnectionFailedEvent(msg);
-    }
-    else {
+    } else {
         send_event(EventType::CLIENT_DISCONNECTED);
     }
 }
@@ -205,7 +219,8 @@ Client::getServerAddress() const
     return m_serverAddress;
 }
 
-const EventTarget* Client::get_event_target() const
+const EventTarget*
+Client::get_event_target() const
 {
     return m_screen->get_event_target();
 }
@@ -216,25 +231,29 @@ Client::getClipboard(ClipboardID id, IClipboard* clipboard) const
     return m_screen->getClipboard(id, clipboard);
 }
 
-void Client::getShape(std::int32_t& x, std::int32_t& y, std::int32_t& w, std::int32_t& h) const
+void
+Client::getShape(std::int32_t& x, std::int32_t& y, std::int32_t& w, std::int32_t& h) const
 {
     m_screen->getShape(x, y, w, h);
 }
 
-void Client::getCursorPos(std::int32_t& x, std::int32_t& y) const
+void
+Client::getCursorPos(std::int32_t& x, std::int32_t& y) const
 {
     m_screen->getCursorPos(x, y);
 }
 
-void Client::enter(std::int32_t xAbs, std::int32_t yAbs, std::uint32_t, KeyModifierMask mask, bool)
+void
+Client::enter(std::int32_t xAbs, std::int32_t yAbs, std::uint32_t, KeyModifierMask mask, bool)
 {
     m_active = true;
     m_screen->mouseMove(xAbs, yAbs);
     m_screen->enter(mask);
 
-    if (m_sendFileThread != nullptr) {
+    if (m_sendFileThread) {
         StreamChunker::interruptFile();
-        m_sendFileThread = nullptr;
+        m_sendFileThread->wait();
+        m_sendFileThread.reset();
     }
 }
 
@@ -260,8 +279,8 @@ Client::leave()
 void
 Client::setClipboard(ClipboardID id, const IClipboard* clipboard)
 {
-     m_screen->setClipboard(id, clipboard);
-    m_ownClipboard[id]  = false;
+    m_screen->setClipboard(id, clipboard);
+    m_ownClipboard[id] = false;
     m_sentClipboard[id] = false;
 }
 
@@ -269,7 +288,7 @@ void
 Client::grabClipboard(ClipboardID id)
 {
     m_screen->grabClipboard(id);
-    m_ownClipboard[id]  = false;
+    m_ownClipboard[id] = false;
     m_sentClipboard[id] = false;
 }
 
@@ -282,43 +301,47 @@ Client::setClipboardDirty(ClipboardID, bool)
 void
 Client::keyDown(KeyID id, KeyModifierMask mask, KeyButton button)
 {
-     m_screen->keyDown(id, mask, button);
+    m_screen->keyDown(id, mask, button);
 }
 
-void Client::keyRepeat(KeyID id, KeyModifierMask mask, std::int32_t count, KeyButton button)
+void
+Client::keyRepeat(KeyID id, KeyModifierMask mask, std::int32_t count, KeyButton button)
 {
-     m_screen->keyRepeat(id, mask, count, button);
+    m_screen->keyRepeat(id, mask, count, button);
 }
 
 void
 Client::keyUp(KeyID id, KeyModifierMask mask, KeyButton button)
 {
-     m_screen->keyUp(id, mask, button);
+    m_screen->keyUp(id, mask, button);
 }
 
 void
 Client::mouseDown(ButtonID id)
 {
-     m_screen->mouseDown(id);
+    m_screen->mouseDown(id);
 }
 
 void
 Client::mouseUp(ButtonID id)
 {
-     m_screen->mouseUp(id);
+    m_screen->mouseUp(id);
 }
 
-void Client::mouseMove(std::int32_t x, std::int32_t y)
+void
+Client::mouseMove(std::int32_t x, std::int32_t y)
 {
     m_screen->mouseMove(x, y);
 }
 
-void Client::mouseRelativeMove(std::int32_t dx, std::int32_t dy)
+void
+Client::mouseRelativeMove(std::int32_t dx, std::int32_t dy)
 {
     m_screen->mouseRelativeMove(dx, dy);
 }
 
-void Client::mouseWheel(std::int32_t xDelta, std::int32_t yDelta)
+void
+Client::mouseWheel(std::int32_t xDelta, std::int32_t yDelta)
 {
     m_screen->mouseWheel(xDelta, yDelta);
 }
@@ -326,7 +349,7 @@ void Client::mouseWheel(std::int32_t xDelta, std::int32_t yDelta)
 void
 Client::screensaver(bool activate)
 {
-     m_screen->screensaver(activate);
+    m_screen->screensaver(activate);
 }
 
 void
@@ -339,7 +362,7 @@ void
 Client::setOptions(const OptionsList& options)
 {
     for (auto index = options.begin(); index != options.end(); ++index) {
-        const OptionID id       = *index;
+        const OptionID id = *index;
         if (id == kOptionClipboardSharing) {
             index++;
             if (*index == static_cast<OptionValue>(false)) {
@@ -359,7 +382,7 @@ Client::setOptions(const OptionsList& options)
     if (m_enableClipboard && !m_maximumClipboardSize) {
         m_enableClipboard = false;
         LOG_NOTE("clipboard sharing is disabled because the server "
-                       "set the maximum clipboard size to 0");
+                 "set the maximum clipboard size to 0");
     }
 
     m_screen->setOptions(options);
@@ -389,8 +412,7 @@ Client::sendClipboard(ClipboardID id)
     m_screen->getClipboard(id, &clipboard);
 
     // check time
-    if (m_timeClipboard[id] == 0 ||
-        clipboard.getTime() != m_timeClipboard[id]) {
+    if (m_timeClipboard[id] == 0 || clipboard.getTime() != m_timeClipboard[id]) {
         // save new time
         m_timeClipboard[id] = clipboard.getTime();
 
@@ -398,8 +420,8 @@ Client::sendClipboard(ClipboardID id)
         std::string data = clipboard.marshall();
         if (data.size() >= m_maximumClipboardSize) {
             LOG_NOTE("Skipping clipboard transfer because the clipboard"
-                " contents exceeds the %zi MB size limit set by the server",
-                m_maximumClipboardSize);
+                     " contents exceeds the %zi MB size limit set by the server",
+                     m_maximumClipboardSize);
             return;
         }
 
@@ -412,7 +434,8 @@ Client::sendClipboard(ClipboardID id)
     }
 }
 
-void Client::send_event(EventType type)
+void
+Client::send_event(EventType type)
 {
     m_events->add_event(type, get_event_target());
 }
@@ -420,13 +443,14 @@ void Client::send_event(EventType type)
 void
 Client::sendConnectionFailedEvent(const char* msg)
 {
-    FailInfo info{msg};
+    FailInfo info{ msg };
     info.m_retry = true;
-    m_events->add_event(EventType::CLIENT_CONNECTION_FAILED, get_event_target(),
-                        create_event_data<FailInfo>(info));
+    m_events->add_event(
+      EventType::CLIENT_CONNECTION_FAILED, get_event_target(), create_event_data<FailInfo>(info));
 }
 
-void Client::send_file_chunk(const FileChunk& chunk)
+void
+Client::send_file_chunk(const FileChunk& chunk)
 {
     LOG_DEBUG1("send file chunk");
     assert(m_server != nullptr);
@@ -440,15 +464,17 @@ Client::setupConnecting()
     assert(m_stream != nullptr);
 
     if (m_args.m_enableCrypto) {
-        m_events->add_handler(EventType::DATA_SOCKET_SECURE_CONNECTED, m_stream->get_event_target(),
-                              [this](const auto& e){ handle_connected(); });
+        m_events->add_handler(EventType::DATA_SOCKET_SECURE_CONNECTED,
+                              m_stream->get_event_target(),
+                              [this](const auto& e) { handle_connected(); });
+    } else {
+        m_events->add_handler(EventType::DATA_SOCKET_CONNECTED,
+                              m_stream->get_event_target(),
+                              [this](const auto& e) { handle_connected(); });
     }
-    else {
-        m_events->add_handler(EventType::DATA_SOCKET_CONNECTED, m_stream->get_event_target(),
-                              [this](const auto& e){ handle_connected(); });
-    }
-    m_events->add_handler(EventType::DATA_SOCKET_CONNECTION_FAILED, m_stream->get_event_target(),
-                          [this](const auto& e){ handle_connection_failed(e); });
+    m_events->add_handler(EventType::DATA_SOCKET_CONNECTION_FAILED,
+                          m_stream->get_event_target(),
+                          [this](const auto& e) { handle_connection_failed(e); });
 }
 
 void
@@ -456,18 +482,24 @@ Client::setupConnection()
 {
     assert(m_stream != nullptr);
 
-    m_events->add_handler(EventType::SOCKET_DISCONNECTED, m_stream->get_event_target(),
-                          [this](const auto& e){ handle_disconnected(); });
-    m_events->add_handler(EventType::STREAM_INPUT_READY, m_stream->get_event_target(),
-                          [this](const auto& e){ handle_hello(); });
-    m_events->add_handler(EventType::STREAM_OUTPUT_ERROR, m_stream->get_event_target(),
-                          [this](const auto& e){ handle_output_error(); });
-    m_events->add_handler(EventType::STREAM_INPUT_SHUTDOWN, m_stream->get_event_target(),
-                          [this](const auto& e){ handle_disconnected(); });
-    m_events->add_handler(EventType::STREAM_OUTPUT_SHUTDOWN, m_stream->get_event_target(),
-                          [this](const auto& e){ handle_disconnected(); });
-    m_events->add_handler(EventType::SOCKET_STOP_RETRY, m_stream->get_event_target(),
-                          [this](const auto& e){ handle_stop_retry(); });
+    m_events->add_handler(EventType::SOCKET_DISCONNECTED,
+                          m_stream->get_event_target(),
+                          [this](const auto& e) { handle_disconnected(); });
+    m_events->add_handler(EventType::STREAM_INPUT_READY,
+                          m_stream->get_event_target(),
+                          [this](const auto& e) { handle_hello(); });
+    m_events->add_handler(EventType::STREAM_OUTPUT_ERROR,
+                          m_stream->get_event_target(),
+                          [this](const auto& e) { handle_output_error(); });
+    m_events->add_handler(EventType::STREAM_INPUT_SHUTDOWN,
+                          m_stream->get_event_target(),
+                          [this](const auto& e) { handle_disconnected(); });
+    m_events->add_handler(EventType::STREAM_OUTPUT_SHUTDOWN,
+                          m_stream->get_event_target(),
+                          [this](const auto& e) { handle_disconnected(); });
+    m_events->add_handler(EventType::SOCKET_STOP_RETRY,
+                          m_stream->get_event_target(),
+                          [this](const auto& e) { handle_stop_retry(); });
 }
 
 void
@@ -475,12 +507,14 @@ Client::setupScreen()
 {
     assert(m_server == nullptr);
 
-    m_ready  = false;
+    m_ready = false;
     m_server = new ServerProxy(this, m_stream, m_events);
-    m_events->add_handler(EventType::SCREEN_SHAPE_CHANGED, get_event_target(),
-                          [this](const auto& e){ handle_shape_changed(); });
-    m_events->add_handler(EventType::CLIPBOARD_GRABBED, get_event_target(),
-                          [this](const auto& e){ handle_clipboard_grabbed(e); });
+    m_events->add_handler(EventType::SCREEN_SHAPE_CHANGED,
+                          get_event_target(),
+                          [this](const auto& e) { handle_shape_changed(); });
+    m_events->add_handler(EventType::CLIPBOARD_GRABBED, get_event_target(), [this](const auto& e) {
+        handle_clipboard_grabbed(e);
+    });
 }
 
 void
@@ -489,8 +523,8 @@ Client::setupTimer()
     assert(m_timer == nullptr);
 
     m_timer = m_events->newOneShotTimer(15.0, nullptr);
-    m_events->add_handler(EventType::TIMER, m_timer,
-                          [this](const auto& e){ handle_connect_timeout(); });
+    m_events->add_handler(
+      EventType::TIMER, m_timer, [this](const auto& e) { handle_connect_timeout(); });
 }
 
 void
@@ -499,7 +533,7 @@ Client::cleanupConnecting()
     if (m_stream != nullptr) {
         m_events->remove_handler(EventType::DATA_SOCKET_CONNECTED, m_stream->get_event_target());
         m_events->remove_handler(EventType::DATA_SOCKET_CONNECTION_FAILED,
-                                m_stream->get_event_target());
+                                 m_stream->get_event_target());
     }
 }
 
@@ -558,13 +592,14 @@ Client::handle_connected()
 
     // reset clipboard state
     for (ClipboardID id = 0; id < kClipboardEnd; ++id) {
-        m_ownClipboard[id]  = false;
+        m_ownClipboard[id] = false;
         m_sentClipboard[id] = false;
         m_timeClipboard[id] = 0;
     }
 }
 
-void Client::handle_connection_failed(const Event& event)
+void
+Client::handle_connection_failed(const Event& event)
 {
     const auto& info = event.get_data_as<IDataSocket::ConnectionFailedInfo>();
 
@@ -575,7 +610,8 @@ void Client::handle_connection_failed(const Event& event)
     sendConnectionFailedEvent(info.m_what.c_str());
 }
 
-void Client::handle_connect_timeout()
+void
+Client::handle_connect_timeout()
 {
     cleanupTimer();
     cleanupConnecting();
@@ -585,7 +621,8 @@ void Client::handle_connect_timeout()
     sendConnectionFailedEvent("Timed out");
 }
 
-void Client::handle_output_error()
+void
+Client::handle_output_error()
 {
     cleanupTimer();
     cleanupScreen();
@@ -594,7 +631,8 @@ void Client::handle_output_error()
     send_event(EventType::CLIENT_DISCONNECTED);
 }
 
-void Client::handle_disconnected()
+void
+Client::handle_disconnected()
 {
     cleanupTimer();
     cleanupScreen();
@@ -603,13 +641,15 @@ void Client::handle_disconnected()
     send_event(EventType::CLIENT_DISCONNECTED);
 }
 
-void Client::handle_shape_changed()
+void
+Client::handle_shape_changed()
 {
     LOG_DEBUG("resolution changed");
     m_server->onInfoChanged();
 }
 
-void Client::handle_clipboard_grabbed(const Event& event)
+void
+Client::handle_clipboard_grabbed(const Event& event)
 {
     if (!m_enableClipboard || (m_maximumClipboardSize == 0)) {
         return;
@@ -621,7 +661,7 @@ void Client::handle_clipboard_grabbed(const Event& event)
     m_server->onGrabClipboard(info.m_id);
 
     // we now own the clipboard and it has not been sent to the server
-    m_ownClipboard[info.m_id]  = true;
+    m_ownClipboard[info.m_id] = true;
     m_sentClipboard[info.m_id] = false;
     m_timeClipboard[info.m_id] = 0;
 
@@ -632,7 +672,8 @@ void Client::handle_clipboard_grabbed(const Event& event)
     }
 }
 
-void Client::handle_hello()
+void
+Client::handle_hello()
 {
     std::int16_t major, minor;
     if (!ProtocolUtil::readf(m_stream, kMsgHello, &major, &minor)) {
@@ -654,9 +695,8 @@ void Client::handle_hello()
 
     // say hello back
     LOG_DEBUG1("say hello version %d.%d", kProtocolMajorVersion, kProtocolMinorVersion);
-    ProtocolUtil::writef(m_stream, kMsgHelloBack,
-                            kProtocolMajorVersion,
-                            kProtocolMinorVersion, &m_name);
+    ProtocolUtil::writef(
+      m_stream, kMsgHelloBack, kProtocolMajorVersion, kProtocolMinorVersion, &m_name);
 
     // now connected but waiting to complete handshake
     setupScreen();
@@ -670,16 +710,18 @@ void Client::handle_hello()
     }
 }
 
-void Client::handle_suspend()
+void
+Client::handle_suspend()
 {
     LOG_INFO("suspend");
-    m_suspended       = true;
+    m_suspended = true;
     bool wasConnected = isConnected();
     disconnect(nullptr);
     m_connectOnResume = wasConnected;
 }
 
-void Client::handle_resume()
+void
+Client::handle_resume()
 {
     LOG_INFO("resume");
     m_suspended = false;
@@ -689,14 +731,16 @@ void Client::handle_resume()
     }
 }
 
-void Client::handle_file_chunk_sending(const Event& event)
+void
+Client::handle_file_chunk_sending(const Event& event)
 {
     send_file_chunk(event.get_data_as<FileChunk>());
 }
 
-void Client::handle_file_receive_completed(const Event& event)
+void
+Client::handle_file_receive_completed(const Event& event)
 {
-    (void) event;
+    (void)event;
 
     onFileReceiveCompleted();
 }
@@ -705,16 +749,22 @@ void
 Client::onFileReceiveCompleted()
 {
     if (isReceivedFileSizeValid()) {
-        m_writeToDropDirThread = new Thread([this](){ write_to_drop_dir_thread(); });
+        if (m_writeToDropDirThread) {
+            m_writeToDropDirThread->wait();
+            m_writeToDropDirThread.reset();
+        }
+        m_writeToDropDirThread = std::make_unique<Thread>([this]() { write_to_drop_dir_thread(); });
     }
 }
 
-void Client::handle_stop_retry()
+void
+Client::handle_stop_retry()
 {
     m_args.m_restartable = false;
 }
 
-void Client::write_to_drop_dir_thread()
+void
+Client::write_to_drop_dir_thread()
 {
     LOG_DEBUG("starting write to drop dir thread");
 
@@ -722,11 +772,12 @@ void Client::write_to_drop_dir_thread()
         inputleap::this_thread_sleep(.1f);
     }
 
-    DropHelper::writeToDir(m_screen->getDropTarget(), m_dragFileList,
-                    m_receivedFileData);
+    DropHelper::writeToDir(m_screen->getDropTarget(), m_dragFileList, m_receivedFileData);
+    LOG_DEBUG("write to drop dir thread completed");
 }
 
-void Client::dragInfoReceived(std::uint32_t fileNum, std::string data)
+void
+Client::dragInfoReceived(std::uint32_t fileNum, std::string data)
 {
     // TODO: fix duplicate function from CServer
     if (!m_args.m_enableDragDrop) {
@@ -748,26 +799,29 @@ Client::isReceivedFileSizeValid()
 void
 Client::sendFileToServer(const char* filename)
 {
-    if (m_sendFileThread != nullptr) {
+    if (m_sendFileThread) {
         StreamChunker::interruptFile();
+        m_sendFileThread->wait();
+        m_sendFileThread.reset();
     }
 
-    m_sendFileThread = new Thread([this, filename]() { send_file_thread(filename); });
+    m_sendFileThread = std::make_unique<Thread>([this, filename]() { send_file_thread(filename); });
 }
 
-void Client::send_file_thread(const char* filename)
+void
+Client::send_file_thread(const char* filename)
 {
+    LOG_DEBUG("starting send file thread");
     try {
         StreamChunker::sendFile(filename, m_events, this);
-    }
-    catch (std::runtime_error& error) {
+    } catch (std::runtime_error& error) {
         LOG_ERR("failed sending file chunks: %s", error.what());
     }
-
-    m_sendFileThread = nullptr;
+    LOG_DEBUG("send file thread completed");
 }
 
-void Client::sendDragInfo(std::uint32_t fileCount, std::string& info, size_t size)
+void
+Client::sendDragInfo(std::uint32_t fileCount, std::string& info, size_t size)
 {
     m_server->sendDragInfo(fileCount, info.c_str(), size);
 }
