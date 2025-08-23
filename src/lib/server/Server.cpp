@@ -38,6 +38,7 @@
 #include "net/IListenSocket.h"
 #include "net/XSocket.h"
 #include "mt/Thread.h"
+#include <utility>
 #include "arch/Arch.h"
 #include "base/EventQueueTimer.h"
 #include "base/IEventQueue.h"
@@ -2238,14 +2239,8 @@ void Server::send_file_thread(const char* filename)
 
 void Server::dragInfoReceived(std::uint32_t fileNum, std::string content)
 {
-	if (!m_args.m_enableDragDrop) {
-		LOG_DEBUG("drag drop not enabled, ignoring drag info.");
-		return;
-	}
-
-	DragInformation::parseDragInfo(m_fakeDragFileList, fileNum, content);
-
-	m_screen->startDraggingFiles(m_fakeDragFileList);
+        DragInformation::handleDragInfo(
+            m_screen, m_fakeDragFileList, m_args.m_enableDragDrop, fileNum, std::move(content));
 }
 
 } // namespace inputleap

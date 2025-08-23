@@ -18,12 +18,14 @@
 #pragma once
 
 #include "base/EventTypes.h"
+#include "inputleap/Fwd.h"
 #include <string>
 #include <vector>
 
 namespace inputleap {
 
 class DragInformation;
+class Screen;
 typedef std::vector<DragInformation> DragFileList;
 
 class DragInformation {
@@ -38,6 +40,11 @@ public:
 
     static void parseDragInfo(DragFileList& dragFileList, std::uint32_t fileNum, std::string data);
     static std::string getDragFileExtension(std::string filename);
+    static void handleDragInfo(Screen* screen,
+                               DragFileList& dragFileList,
+                               bool enableDragDrop,
+                               std::uint32_t fileNum,
+                               std::string data);
     // helper function to setup drag info
     // example: filename1,filesize1,filename2,filesize2,
     // return file count
