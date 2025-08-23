@@ -33,7 +33,11 @@ option(INPUTLEAP_BUILD_GULRAK_FILESYSTEM "Use internal filesystem library" OFF)
 set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set (CMAKE_CXX_EXTENSIONS OFF)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
-# Place compiled binaries and libraries under a common build directory
+# Generate compile_commands.json for tooling, disable compiler-specific language
+# extensions, and enforce adherence to the requested C++ standard.
+#
+# Place compiled binaries and libraries under a common build directory to keep
+# artifacts in a single location.
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
