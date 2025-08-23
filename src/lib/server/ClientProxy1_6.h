@@ -18,10 +18,11 @@
 
 #pragma once
 
-#include "server/ClientProxy.h"
 #include "base/Fwd.h"
 #include "inputleap/Clipboard.h"
 #include "inputleap/protocol_types.h"
+#include "server/ClientProxy.h"
+#include <string>
 
 namespace inputleap {
 
@@ -29,10 +30,13 @@ class Server;
 class IStream;
 
 //! Proxy for client implementing protocol version 1.0
-class ClientProxy1_6 : public ClientProxy {
-public:
-    ClientProxy1_6(const std::string& name, std::unique_ptr<IClientConnection> backend,
-                   Server* server, IEventQueue* events);
+class ClientProxy1_6 : public ClientProxy
+{
+  public:
+    ClientProxy1_6(const std::string& name,
+                   std::unique_ptr<IClientConnection> backend,
+                   Server* server,
+                   IEventQueue* events);
     ~ClientProxy1_6() override;
 
     Server* getServer() { return m_server; }
@@ -41,12 +45,17 @@ public:
 
     // IScreen
     bool getClipboard(ClipboardID id, IClipboard*) const override;
-    void getShape(std::int32_t& x, std::int32_t& y, std::int32_t& width,
+    void getShape(std::int32_t& x,
+                  std::int32_t& y,
+                  std::int32_t& width,
                   std::int32_t& height) const override;
     void getCursorPos(std::int32_t& x, std::int32_t& y) const override;
 
     // IClient overrides
-    void enter(std::int32_t xAbs, std::int32_t yAbs, std::uint32_t seqNum, KeyModifierMask mask,
+    void enter(std::int32_t xAbs,
+               std::int32_t yAbs,
+               std::uint32_t seqNum,
+               KeyModifierMask mask,
                bool forScreensaver) override;
     bool leave() override;
     void setClipboard(ClipboardID, const IClipboard*) override;
@@ -66,9 +75,15 @@ public:
     void sendDragInfo(std::uint32_t fileCount, const char* info, size_t size) override;
     void file_chunk_sending(const FileChunk& chunk) override;
 
-protected:
-    virtual bool parseHandshakeMessage(const std::uint8_t* code);
-    virtual bool parseMessage(const std::uint8_t* code);
+  protected:
+    enum EResult
+    {
+        kOkay,
+        kUnknown,
+        kDisconnect
+    };
+    virtual EResult parseHandshakeMessage(const std::uint8_t* code);
+    virtual EResult parseMessage(const std::uint8_t* code);
 
     virtual void resetHeartbeatRate();
     virtual void setHeartbeatRate(double rate, double alarm);
@@ -81,8 +96,8 @@ protected:
     void fileChunkReceived();
     void dragInfoReceived();
 
-private:
-    void disconnect();
+  private:
+    void disconnect(const char* reason);
     void remove_handlers();
 
     void handle_data();
@@ -94,12 +109,13 @@ private:
     bool recvInfo();
     bool recvGrabClipboard();
 
-protected:
-    struct ClientClipboard {
-    public:
+  protected:
+    struct ClientClipboard
+    {
+      public:
         ClientClipboard();
 
-    public:
+      public:
         Clipboard m_clipboard;
         std::uint32_t m_sequenceNumber;
         bool m_dirty;
@@ -107,8 +123,8 @@ protected:
 
     ClientClipboard m_clipboard[kClipboardEnd];
 
-protected:
-    typedef bool (ClientProxy1_6::*MessageParser)(const std::uint8_t*);
+  protected:
+    typedef EResult (ClientProxy1_6::*MessageParser)(const std::uint8_t*);
 
     ClientInfo m_info;
     double m_heartbeatAlarm;
@@ -119,6 +135,7 @@ protected:
     double m_keepAliveRate;
     EventQueueTimer* m_keepAliveTimer;
     Server* m_server;
+    std::string m_disconnectReason;
 };
 
 } // namespace inputleap
