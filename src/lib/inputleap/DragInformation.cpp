@@ -17,10 +17,12 @@
 
 #include "inputleap/DragInformation.h"
 #include "base/Log.h"
+#include "inputleap/Screen.h"
 
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
+#include <utility>
 
 namespace inputleap {
 
@@ -28,6 +30,21 @@ DragInformation::DragInformation() :
     m_filename(),
     m_filesize(0)
 {
+}
+
+void DragInformation::handleDragInfo(Screen* screen,
+                                     DragFileList& dragFileList,
+                                     bool enableDragDrop,
+                                     std::uint32_t fileNum,
+                                     std::string data)
+{
+    if (!enableDragDrop) {
+        LOG_DEBUG("drag drop not enabled, ignoring drag info.");
+        return;
+    }
+
+    parseDragInfo(dragFileList, fileNum, std::move(data));
+    screen->startDraggingFiles(dragFileList);
 }
 
 void DragInformation::parseDragInfo(DragFileList& dragFileList, std::uint32_t fileNum,

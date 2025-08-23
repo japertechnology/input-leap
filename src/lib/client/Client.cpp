@@ -38,6 +38,7 @@
 #include "net/ISocketFactory.h"
 #include "net/SecureSocket.h"
 #include "net/TCPSocket.h"
+#include <utility>
 
 #include <climits>
 #include <cstdlib>
@@ -779,15 +780,8 @@ Client::write_to_drop_dir_thread()
 void
 Client::dragInfoReceived(std::uint32_t fileNum, std::string data)
 {
-    // TODO: fix duplicate function from CServer
-    if (!m_args.m_enableDragDrop) {
-        LOG_DEBUG("drag drop not enabled, ignoring drag info.");
-        return;
-    }
-
-    DragInformation::parseDragInfo(m_dragFileList, fileNum, data);
-
-    m_screen->startDraggingFiles(m_dragFileList);
+    DragInformation::handleDragInfo(
+        m_screen, m_dragFileList, m_args.m_enableDragDrop, fileNum, std::move(data));
 }
 
 bool
