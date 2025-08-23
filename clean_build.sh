@@ -40,9 +40,12 @@ fi
 # allow local customizations to build environment
 [ -r ./build_env.sh ] && . ./build_env.sh
 
+# Exit immediately if any command fails to prevent continuing from a
+# partially configured state.
 set -e
 
-# Initialise Git submodules
+# Ensure all required third-party code is available.  This step pulls
+# down and updates any git submodules the project depends on.
 git submodule update --init --recursive
 
 # Remove any existing build directory to ensure a clean start
