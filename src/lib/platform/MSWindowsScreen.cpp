@@ -111,6 +111,7 @@ MSWindowsScreen::MSWindowsScreen(
     m_window(nullptr),
     m_nextClipboardWindow(nullptr),
     m_ownClipboard(false),
+    m_inDrawClipboard(false),
     m_desks(nullptr),
     m_keyState(nullptr),
     m_hasMouse(GetSystemMetrics(SM_MOUSEPRESENT) != 0),
@@ -1010,13 +1011,22 @@ MSWindowsScreen::onEvent(HWND, UINT msg,
 {
     switch (msg) {
     case WM_DRAWCLIPBOARD:
+        if (m_inDrawClipboard) {
+            LOG_DEBUG("clipboard: ignoring recursive WM_DRAWCLIPBOARD");
+            return true;
+        }
+        m_inDrawClipboard = true;
+
         // first pass on the message
-        if (m_nextClipboardWindow != nullptr) {
+        if (m_nextClipboardWindow != nullptr && m_nextClipboardWindow != m_window) {
             SendMessage(m_nextClipboardWindow, msg, wParam, lParam);
         }
 
         // now handle the message
-        return onClipboardChange();
+        bool handled = onClipboardChange();
+
+        m_inDrawClipboard = false;
+        return handled;
 
     case WM_CHANGECBCHAIN:
         if (m_nextClipboardWindow == (HWND)wParam) {
@@ -1568,18 +1578,9 @@ void MSWindowsScreen::handle_fixes()
 void
 MSWindowsScreen::fixClipboardViewer()
 {
-    // XXX -- disable this code for now.  somehow it can cause an infinite
-    // recursion in the WM_DRAWCLIPBOARD handler.  either we're sending
-    // the message to our own window or some window farther down the chain
-    // forwards the message to our window or a window farther up the chain.
-    // i'm not sure how that could happen.  the m_nextClipboardWindow = nullptr
-    // was not in the code that infinite loops and may fix the bug but i
-    // doubt it.
-/*
     ChangeClipboardChain(m_window, m_nextClipboardWindow);
     m_nextClipboardWindow = nullptr;
     m_nextClipboardWindow = SetClipboardViewer(m_window);
-*/
 }
 
 void
