@@ -84,6 +84,7 @@ class ServerProxy : public EventTarget
 
     void resetKeepAliveAlarm();
     void setKeepAliveRate(double);
+    void handleDisconnect();
 
     // modifier key translation
     KeyID translateKey(KeyID) const;
