@@ -40,18 +40,49 @@
 class QThreadImpl : public QThread
 {
 public:
-	static void msleep(unsigned long msecs)
-	{
-		QThread::msleep(msecs);
-	}
+        /**
+         * @brief Expose QThread::msleep as a public helper.
+         *
+         * QThread::msleep is protected in Qt.  This trivial subclass
+         * simply provides a public wrapper so other parts of the code
+         * can sleep the thread without instantiating an object.
+         */
+        static void msleep(unsigned long msecs)
+        {
+                QThread::msleep(msecs);
+        }
 };
 
+/**
+ * @brief Wait for the system tray to become available.
+ *
+ * Many desktop environments initialise the tray asynchronously.  The
+ * application cannot proceed with tray-only operation until the tray
+ * exists, so this helper polls for availability and returns once the
+ * tray can be used or a timeout is reached.
+ */
 int waitForTray();
 
 #if defined(Q_OS_MAC)
+/**
+ * @brief Verify macOS accessibility permissions.
+ *
+ * Input Leap needs assistive device privileges to capture input on
+ * macOS.  This function prompts the user if permissions are missing and
+ * reports whether the application is trusted to use the accessibility
+ * APIs.
+ */
 bool checkMacAssistiveDevices();
 #endif
 
+/**
+ * @brief Copy all key/value pairs from one QSettings store to another.
+ *
+ * @param src  Existing settings object that provides configuration
+ *             values.
+ * @param dst  Destination settings object that receives all keys
+ *             and values from @p src.
+ */
 void copy_qsettings(const QSettings &src, QSettings &dst)
 {
     const auto keys = src.allKeys();
@@ -60,6 +91,15 @@ void copy_qsettings(const QSettings &src, QSettings &dst)
     }
 }
 
+/**
+ * @brief Application entry point.
+ *
+ * Sets up the Qt environment, performs platform-specific checks and
+ * migrates legacy configuration before starting the main event loop.
+ *
+ * @param argc Number of command line arguments.
+ * @param argv Array of command line argument strings.
+ */
 int main(int argc, char* argv[])
 {
 #if (defined(WINAPI_XWINDOWS) || \
@@ -151,25 +191,27 @@ int main(int argc, char* argv[])
 
 int waitForTray()
 {
-	// on linux, the system tray may not be available immediately after logging in,
-	// so keep retrying but give up after a short time.
-	int trayAttempts = 0;
-	while (true)
-	{
-		if (QSystemTrayIcon::isSystemTrayAvailable())
-		{
-			break;
-		}
+        // On Linux the system tray may not be immediately ready after
+        // login, so retry a handful of times before giving up.  This
+        // allows the application to continue even on systems without a
+        // tray while still supporting tray-only mode when available.
+        int trayAttempts = 0;
+        while (true)
+        {
+                if (QSystemTrayIcon::isSystemTrayAvailable())
+                {
+                        break;
+                }
 
-		if (++trayAttempts > TRAY_RETRY_COUNT)
-		{
-			fprintf(stdout, "System tray is unavailable.\n");
-			return false;
-		}
+                if (++trayAttempts > TRAY_RETRY_COUNT)
+                {
+                        fprintf(stdout, "System tray is unavailable.\n");
+                        return false;
+                }
 
-		QThreadImpl::msleep(TRAY_RETRY_WAIT);
-	}
-	return true;
+                QThreadImpl::msleep(TRAY_RETRY_WAIT);
+        }
+        return true;
 }
 
 #if defined(Q_OS_MAC)
