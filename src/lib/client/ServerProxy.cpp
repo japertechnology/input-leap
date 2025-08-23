@@ -103,6 +103,12 @@ ServerProxy::setKeepAliveRate(double rate)
 }
 
 void
+ServerProxy::handleDisconnect()
+{
+    disconnect(m_disconnectReason.empty() ? nullptr : m_disconnectReason.c_str());
+}
+
+void
 ServerProxy::handle_data()
 {
     // handle messages until there are no more.  first read message code.
@@ -112,7 +118,8 @@ ServerProxy::handle_data()
         // verify we got an entire code
         if (n != 4) {
             LOG_ERR("incomplete message from server: %d bytes", n);
-            disconnect("incomplete message from server");
+            m_disconnectReason = "incomplete message from server";
+            handleDisconnect();
             return;
         }
 
@@ -126,22 +133,21 @@ ServerProxy::handle_data()
                 case kUnknown:
                     LOG_ERR(
                       "invalid message from server: %c%c%c%c", code[0], code[1], code[2], code[3]);
-                    disconnect("invalid message from server");
+                    m_disconnectReason = "invalid message from server";
+                    handleDisconnect();
                     return;
 
                 case kDisconnect:
-                    disconnect(m_disconnectReason.empty() ? nullptr : m_disconnectReason.c_str());
+                    handleDisconnect();
                     return;
                 default:
                     break;
             }
         } catch (const XBadClient& e) {
-            // TODO: disconnect handling is currently dispersed across both parseMessage() and
-            // handleData() functions, we should collect that to a single place
-
             LOG_ERR("protocol error from server: %s", e.what());
             ProtocolUtil::writef(m_stream, kMsgEBad);
-            disconnect("invalid message from server");
+            m_disconnectReason = "invalid message from server";
+            handleDisconnect();
             return;
         }
 
@@ -340,7 +346,8 @@ void
 ServerProxy::handle_keep_alive_alarm()
 {
     LOG_NOTE("server is dead");
-    disconnect("server is not responding");
+    m_disconnectReason = "server is not responding";
+    handleDisconnect();
 }
 
 void
