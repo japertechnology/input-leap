@@ -296,6 +296,7 @@ private:
     HWND m_nextClipboardWindow;
     bool m_ownClipboard;
     bool m_inDrawClipboard;
+    bool m_ignoreNextDrawClipboard;
 
     // one desk per desktop and a cond var to communicate with it
     MSWindowsDesks* m_desks;
