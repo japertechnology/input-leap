@@ -18,26 +18,25 @@
 #include "SecureSocket.h"
 #include "SecureUtils.h"
 
-#include "net/TSocketMultiplexerMethodJob.h"
-#include "net/TCPSocket.h"
 #include "arch/XArch.h"
 #include "base/Log.h"
 #include "base/String.h"
-#include "base/finally.h"
 #include "base/Time.h"
+#include "base/finally.h"
 #include "common/DataDirectories.h"
 #include "io/filesystem.h"
 #include "net/FingerprintDatabase.h"
+#include "net/TCPSocket.h"
+#include "net/TSocketMultiplexerMethodJob.h"
 
-#include <openssl/ssl.h>
-#include <openssl/err.h>
-#include <openssl/x509_vfy.h>
-#include <openssl/bio.h>
-#include <cstring>
 #include <cstdlib>
-#include <memory>
+#include <cstring>
 #include <fstream>
 #include <memory>
+#include <openssl/bio.h>
+#include <openssl/err.h>
+#include <openssl/ssl.h>
+#include <openssl/x509_vfy.h>
 #include <string>
 
 namespace inputleap {
@@ -47,31 +46,36 @@ namespace inputleap {
 static const std::size_t MAX_INPUT_BUFFER_SIZE = 1024 * 1024;
 static const float s_retryDelay = 0.01f;
 
-enum {
+enum
+{
     kMsgSize = 128
 };
 
-struct Ssl {
+struct Ssl
+{
     SSL_CTX* m_context = nullptr;
     SSL* m_ssl = nullptr;
 };
 
-SecureSocket::SecureSocket(IEventQueue* events, SocketMultiplexer* socketMultiplexer,
+SecureSocket::SecureSocket(IEventQueue* events,
+                           SocketMultiplexer* socketMultiplexer,
                            IArchNetwork::EAddressFamily family,
-                           ConnectionSecurityLevel security_level) :
-    TCPSocket(events, socketMultiplexer, family),
-    m_secureReady(false),
-    m_fatal(false),
-    security_level_{security_level}
+                           ConnectionSecurityLevel security_level)
+  : TCPSocket(events, socketMultiplexer, family)
+  , m_secureReady(false)
+  , m_fatal(false)
+  , security_level_{ security_level }
 {
 }
 
-SecureSocket::SecureSocket(IEventQueue* events, SocketMultiplexer* socketMultiplexer,
-                           ArchSocket socket, ConnectionSecurityLevel security_level) :
-    TCPSocket(events, socketMultiplexer, socket),
-    m_secureReady(false),
-    m_fatal(false),
-    security_level_{security_level}
+SecureSocket::SecureSocket(IEventQueue* events,
+                           SocketMultiplexer* socketMultiplexer,
+                           ArchSocket socket,
+                           ConnectionSecurityLevel security_level)
+  : TCPSocket(events, socketMultiplexer, socket)
+  , m_secureReady(false)
+  , m_fatal(false)
+  , security_level_{ security_level }
 {
 }
 
@@ -93,9 +97,10 @@ SecureSocket::close()
     TCPSocket::close();
 }
 
-void SecureSocket::freeSSLResources()
+void
+SecureSocket::freeSSLResources()
 {
-    std::lock_guard<std::mutex> ssl_lock{ssl_mutex_};
+    std::lock_guard<std::mutex> ssl_lock{ ssl_mutex_ };
     if (m_ssl) {
         if (m_ssl->m_ssl) {
             SSL_shutdown(m_ssl->m_ssl);
@@ -113,13 +118,15 @@ void SecureSocket::freeSSLResources()
 void
 SecureSocket::connect(const NetworkAddress& addr)
 {
-    m_events->add_handler(EventType::DATA_SOCKET_CONNECTED, get_event_target(),
-                          [this](const auto& e){ handle_tcp_connected(e); });
+    m_events->add_handler(EventType::DATA_SOCKET_CONNECTED,
+                          get_event_target(),
+                          [this](const auto& e) { handle_tcp_connected(e); });
 
     TCPSocket::connect(addr);
 }
 
-std::unique_ptr<ISocketMultiplexerJob> SecureSocket::newJob()
+std::unique_ptr<ISocketMultiplexerJob>
+SecureSocket::newJob()
 {
     // after TCP connection is established, SecureSocket will pick up
     // connected event and do secureConnect
@@ -133,17 +140,21 @@ std::unique_ptr<ISocketMultiplexerJob> SecureSocket::newJob()
 void
 SecureSocket::secureConnect()
 {
-    setJob(std::make_unique<TSocketMultiplexerMethodJob>([this](auto j, auto r, auto w, auto e)
-                                                         { return serviceConnect(j, r, w, e); },
-                                                         getSocket(), isReadable(), isWritable()));
+    setJob(std::make_unique<TSocketMultiplexerMethodJob>(
+      [this](auto j, auto r, auto w, auto e) { return serviceConnect(j, r, w, e); },
+      getSocket(),
+      isReadable(),
+      isWritable()));
 }
 
 void
 SecureSocket::secureAccept()
 {
-    setJob(std::make_unique<TSocketMultiplexerMethodJob>([this](auto j, auto r, auto w, auto e)
-                                                         { return serviceAccept(j, r, w, e); },
-                                                         getSocket(), isReadable(), isWritable()));
+    setJob(std::make_unique<TSocketMultiplexerMethodJob>(
+      [this](auto j, auto r, auto w, auto e) { return serviceAccept(j, r, w, e); },
+      getSocket(),
+      isReadable(),
+      isWritable()));
 }
 
 TCPSocket::EJobResult
@@ -158,12 +169,10 @@ SecureSocket::doRead()
         status = secureRead(buffer, sizeof(buffer), bytesRead);
         if (status < 0) {
             return kBreak;
-        }
-        else if (status == 0) {
+        } else if (status == 0) {
             return kNew;
         }
-    }
-    else {
+    } else {
         return kRetry;
     }
 
@@ -188,8 +197,7 @@ SecureSocket::doRead()
         if (wasEmpty) {
             sendEvent(EventType::STREAM_INPUT_READY);
         }
-    }
-    else {
+    } else {
         // remote write end of stream hungup.  our input side
         // has therefore shutdown but don't flush our buffer
         // since there's still data to be read.
@@ -255,7 +263,7 @@ SecureSocket::doWrite()
 int
 SecureSocket::secureRead(void* buffer, int size, int& read)
 {
-    std::lock_guard<std::mutex> ssl_lock{ssl_mutex_};
+    std::lock_guard<std::mutex> ssl_lock{ ssl_mutex_ };
 
     if (m_ssl->m_ssl != nullptr) {
         LOG_DEBUG2("reading secure socket");
@@ -281,7 +289,7 @@ SecureSocket::secureRead(void* buffer, int size, int& read)
 int
 SecureSocket::secureWrite(const void* buffer, int size, int& wrote)
 {
-    std::lock_guard<std::mutex> ssl_lock{ssl_mutex_};
+    std::lock_guard<std::mutex> ssl_lock{ ssl_mutex_ };
 
     if (m_ssl->m_ssl != nullptr) {
         LOG_DEBUG2("writing secure socket:%p", this);
@@ -314,21 +322,21 @@ SecureSocket::isSecureReady()
 void
 SecureSocket::initSsl(bool server)
 {
-    std::lock_guard<std::mutex> ssl_lock{ssl_mutex_};
+    std::lock_guard<std::mutex> ssl_lock{ ssl_mutex_ };
 
     m_ssl = std::make_unique<Ssl>();
     initContext(server);
 }
 
-bool SecureSocket::load_certificates(const inputleap::fs::path& path)
+bool
+SecureSocket::load_certificates(const inputleap::fs::path& path)
 {
-    std::lock_guard<std::mutex> ssl_lock{ssl_mutex_};
+    std::lock_guard<std::mutex> ssl_lock{ ssl_mutex_ };
 
     if (path.empty()) {
         showError("ssl certificate is not specified");
         return false;
-    }
-    else {
+    } else {
         if (!inputleap::fs::is_regular_file(path)) {
             showError("ssl certificate doesn't exist: " + path.u8string());
             return false;
@@ -357,13 +365,13 @@ bool SecureSocket::load_certificates(const inputleap::fs::path& path)
     return true;
 }
 
-static int cert_verify_callback(X509_STORE_CTX* ctx, void*)
+static int
+cert_verify_callback(X509_STORE_CTX* ctx, void*)
 {
     int result = X509_verify_cert(ctx);
     if (result <= 0) {
         int err = X509_STORE_CTX_get_error(ctx);
-        LOG_ERR("certificate verification failed: %s",
-                X509_verify_cert_error_string(err));
+        LOG_ERR("certificate verification failed: %s", X509_verify_cert_error_string(err));
     }
     return result;
 }
@@ -372,16 +380,12 @@ void
 SecureSocket::initContext(bool server)
 {
     // ssl_mutex_ is assumed to be acquired
-
-    SSL_library_init();
+    // initialise OpenSSL and load error strings. Using OPENSSL_init_ssl
+    // avoids the deprecated SSL_library_init/OpenSSL_add_all_algorithms
+    // combo which also registered weak algorithms globally.
+    OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS | OPENSSL_INIT_LOAD_CRYPTO_STRINGS, nullptr);
 
     const SSL_METHOD* method;
-
-    // load & register all cryptos, etc.
-    OpenSSL_add_all_algorithms();
-
-    // load all error messages
-    SSL_load_error_strings();
 
     if (CLOG->getFilter() >= kINFO) {
         showSecureLibInfo();
@@ -389,8 +393,7 @@ SecureSocket::initContext(bool server)
 
     if (server) {
         method = TLS_server_method();
-    }
-    else {
+    } else {
         method = TLS_client_method();
     }
 
@@ -400,8 +403,13 @@ SecureSocket::initContext(bool server)
 
     // enforce TLS 1.2+ and drop older protocols
     SSL_CTX_set_min_proto_version(m_ssl->m_context, TLS1_2_VERSION);
-    SSL_CTX_set_options(m_ssl->m_context,
-                        SSL_OP_NO_SSLv3 | SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1);
+    SSL_CTX_set_options(m_ssl->m_context, SSL_OP_NO_SSLv3 | SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1);
+
+    // explicitly configure strong cipher suites
+    SSL_CTX_set_cipher_list(m_ssl->m_context, "HIGH:!aNULL:!MD5:!3DES");
+    SSL_CTX_set_ciphersuites(
+      m_ssl->m_context,
+      "TLS_AES_256_GCM_SHA384:TLS_AES_128_GCM_SHA256:TLS_CHACHA20_POLY1305_SHA256");
 
     if (m_ssl->m_context == nullptr) {
         showError("");
@@ -410,8 +418,8 @@ SecureSocket::initContext(bool server)
     if (security_level_ == ConnectionSecurityLevel::ENCRYPTED_AUTHENTICATED) {
         // Require and verify the peer certificate. If no certificate is provided or the
         // certificate chain cannot be validated, the connection will fail.
-        SSL_CTX_set_verify(m_ssl->m_context, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
-                           nullptr);
+        SSL_CTX_set_verify(
+          m_ssl->m_context, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
         SSL_CTX_set_cert_verify_callback(m_ssl->m_context, cert_verify_callback, nullptr);
     }
 }
@@ -432,7 +440,7 @@ SecureSocket::createSSL()
 int
 SecureSocket::secureAccept(int socket)
 {
-    std::lock_guard<std::mutex> ssl_lock{ssl_mutex_};
+    std::lock_guard<std::mutex> ssl_lock{ ssl_mutex_ };
 
     createSSL();
 
@@ -458,10 +466,9 @@ SecureSocket::secureAccept(int socket)
     if (secure_accept_retry_ == 0) {
         if (security_level_ == ConnectionSecurityLevel::ENCRYPTED_AUTHENTICATED) {
             if (verify_peer_certificate(
-                        inputleap::DataDirectories::trusted_clients_ssl_fingerprints_path())) {
+                  inputleap::DataDirectories::trusted_clients_ssl_fingerprints_path())) {
                 LOG_INFO("accepted secure socket");
-            }
-            else {
+            } else {
                 LOG_ERR("failed to verify client certificate fingerprint");
                 secure_accept_retry_ = 0;
                 disconnect();
@@ -504,7 +511,7 @@ SecureSocket::secureConnect(int socket)
         return -1;
     }
 
-    std::lock_guard<std::mutex> ssl_lock{ssl_mutex_};
+    std::lock_guard<std::mutex> ssl_lock{ ssl_mutex_ };
 
     createSSL();
 
@@ -533,10 +540,10 @@ SecureSocket::secureConnect(int socket)
     secure_connect_retry_ = 0;
     // No error, set ready, process and return ok
     m_secureReady = true;
-    if (verify_peer_certificate(inputleap::DataDirectories::trusted_servers_ssl_fingerprints_path())) {
+    if (verify_peer_certificate(
+          inputleap::DataDirectories::trusted_servers_ssl_fingerprints_path())) {
         LOG_INFO("connected to secure socket");
-    }
-    else {
+    } else {
         LOG_ERR("failed to verify server certificate fingerprint");
         disconnect();
         return -1; // Fingerprint failed, error
@@ -560,70 +567,68 @@ SecureSocket::checkResult(int status, int& retry)
     int errorCode = SSL_get_error(m_ssl->m_ssl, status);
 
     switch (errorCode) {
-    case SSL_ERROR_NONE:
-        retry = 0;
-        // operation completed
-        break;
+        case SSL_ERROR_NONE:
+            retry = 0;
+            // operation completed
+            break;
 
-    case SSL_ERROR_ZERO_RETURN:
-        // connection closed
-        isFatal(true);
-        LOG_DEBUG("ssl connection closed");
-        break;
+        case SSL_ERROR_ZERO_RETURN:
+            // connection closed
+            isFatal(true);
+            LOG_DEBUG("ssl connection closed");
+            break;
 
-    case SSL_ERROR_WANT_READ:
-        retry++;
-        LOG_DEBUG2("want to read, error=%d, attempt=%d", errorCode, retry);
-        break;
+        case SSL_ERROR_WANT_READ:
+            retry++;
+            LOG_DEBUG2("want to read, error=%d, attempt=%d", errorCode, retry);
+            break;
 
-    case SSL_ERROR_WANT_WRITE:
-        // Need to make sure the socket is known to be writable so the impending
-        // select action actually triggers on a write. This isn't necessary for
-        // m_readable because the socket logic is always readable
-        m_writable = true;
-        retry++;
-        LOG_DEBUG2("want to write, error=%d, attempt=%d", errorCode, retry);
-        break;
+        case SSL_ERROR_WANT_WRITE:
+            // Need to make sure the socket is known to be writable so the impending
+            // select action actually triggers on a write. This isn't necessary for
+            // m_readable because the socket logic is always readable
+            m_writable = true;
+            retry++;
+            LOG_DEBUG2("want to write, error=%d, attempt=%d", errorCode, retry);
+            break;
 
-    case SSL_ERROR_WANT_CONNECT:
-        retry++;
-        LOG_DEBUG2("want to connect, error=%d, attempt=%d", errorCode, retry);
-        break;
+        case SSL_ERROR_WANT_CONNECT:
+            retry++;
+            LOG_DEBUG2("want to connect, error=%d, attempt=%d", errorCode, retry);
+            break;
 
-    case SSL_ERROR_WANT_ACCEPT:
-        retry++;
-        LOG_DEBUG2("want to accept, error=%d, attempt=%d", errorCode, retry);
-        break;
+        case SSL_ERROR_WANT_ACCEPT:
+            retry++;
+            LOG_DEBUG2("want to accept, error=%d, attempt=%d", errorCode, retry);
+            break;
 
-    case SSL_ERROR_SYSCALL:
-        LOG_ERR("ssl error occurred (system call failure)");
-        if (ERR_peek_error() == 0) {
-            if (status == 0) {
-                LOG_ERR("eof violates ssl protocol");
-            }
-            else if (status == -1) {
-                // underlying socket I/O reproted an error
-                try {
-                    ARCH->throwErrorOnSocket(getSocket());
+        case SSL_ERROR_SYSCALL:
+            LOG_ERR("ssl error occurred (system call failure)");
+            if (ERR_peek_error() == 0) {
+                if (status == 0) {
+                    LOG_ERR("eof violates ssl protocol");
+                } else if (status == -1) {
+                    // underlying socket I/O reproted an error
+                    try {
+                        ARCH->throwErrorOnSocket(getSocket());
+                    } catch (XArchNetwork& e) {
+                        LOG_ERR("%s", e.what());
+                    }
                 }
-                catch (XArchNetwork& e) {
-                    LOG_ERR("%s", e.what());
-                }
             }
-        }
 
-        isFatal(true);
-        break;
+            isFatal(true);
+            break;
 
-    case SSL_ERROR_SSL:
-        LOG_ERR("ssl error occurred (generic failure)");
-        isFatal(true);
-        break;
+        case SSL_ERROR_SSL:
+            LOG_ERR("ssl error occurred (generic failure)");
+            isFatal(true);
+            break;
 
-    default:
-        LOG_ERR("ssl error occurred (unknown failure)");
-        isFatal(true);
-        break;
+        default:
+            LOG_ERR("ssl error occurred (unknown failure)");
+            isFatal(true);
+            break;
     }
 
     if (isFatal()) {
@@ -633,7 +638,8 @@ SecureSocket::checkResult(int status, int& retry)
     }
 }
 
-void SecureSocket::showError(const std::string& reason)
+void
+SecureSocket::showError(const std::string& reason)
 {
     if (!reason.empty()) {
         LOG_ERR("%s", reason.c_str());
@@ -645,7 +651,8 @@ void SecureSocket::showError(const std::string& reason)
     }
 }
 
-std::string SecureSocket::getError()
+std::string
+SecureSocket::getError()
 {
     unsigned long e = ERR_get_error();
 
@@ -653,8 +660,7 @@ std::string SecureSocket::getError()
         char error[MAX_ERROR_SIZE];
         ERR_error_string_n(e, error, MAX_ERROR_SIZE);
         return error;
-    }
-    else {
+    } else {
         return "";
     }
 }
@@ -667,7 +673,8 @@ SecureSocket::disconnect()
     sendEvent(EventType::STREAM_INPUT_SHUTDOWN);
 }
 
-bool SecureSocket::verify_peer_certificate(const inputleap::fs::path& fingerprint_db_path)
+bool
+SecureSocket::verify_peer_certificate(const inputleap::fs::path& fingerprint_db_path)
 {
     // ssl_mutex_ is assumed to be acquired
 
@@ -706,10 +713,10 @@ bool SecureSocket::verify_peer_certificate(const inputleap::fs::path& fingerprin
     // calculate received certificate fingerprint
     inputleap::FingerprintData fingerprint_sha1, fingerprint_sha256;
     try {
-        fingerprint_sha1 = inputleap::get_ssl_cert_fingerprint(cert,
-                                                             inputleap::FingerprintType::SHA1);
-        fingerprint_sha256 = inputleap::get_ssl_cert_fingerprint(cert,
-                                                               inputleap::FingerprintType::SHA256);
+        fingerprint_sha1 =
+          inputleap::get_ssl_cert_fingerprint(cert, inputleap::FingerprintType::SHA1);
+        fingerprint_sha256 =
+          inputleap::get_ssl_cert_fingerprint(cert, inputleap::FingerprintType::SHA256);
     } catch (const std::exception& e) {
         LOG_ERR("%s", e.what());
         return false;
@@ -717,8 +724,8 @@ bool SecureSocket::verify_peer_certificate(const inputleap::fs::path& fingerprin
 
     // note: the GUI parses the following two lines of logs, don't change unnecessarily
     LOG_NOTE("peer fingerprint (SHA1): %s (SHA256): %s",
-         inputleap::format_ssl_fingerprint(fingerprint_sha1.data).c_str(),
-         inputleap::format_ssl_fingerprint(fingerprint_sha256.data).c_str());
+             inputleap::format_ssl_fingerprint(fingerprint_sha1.data).c_str(),
+             inputleap::format_ssl_fingerprint(fingerprint_sha256.data).c_str());
 
     // Provide debug hint as to what file is being used to verify fingerprint trust
     LOG_NOTE("fingerprint_db_path: %s", fingerprint_db_path.u8string().c_str());
@@ -727,11 +734,11 @@ bool SecureSocket::verify_peer_certificate(const inputleap::fs::path& fingerprin
     db.read(fingerprint_db_path);
 
     if (!db.fingerprints().empty()) {
-        LOG_NOTE("Read %zd fingerprints from: %s", db.fingerprints().size(),
-             fingerprint_db_path.u8string().c_str());
+        LOG_NOTE("Read %zd fingerprints from: %s",
+                 db.fingerprints().size(),
+                 fingerprint_db_path.u8string().c_str());
     } else {
-        LOG_NOTE("Could not read fingerprints from: %s",
-             fingerprint_db_path.u8string().c_str());
+        LOG_NOTE("Could not read fingerprints from: %s", fingerprint_db_path.u8string().c_str());
     }
 
     if (db.is_trusted(fingerprint_sha256)) {
@@ -743,13 +750,13 @@ bool SecureSocket::verify_peer_certificate(const inputleap::fs::path& fingerprin
     }
 }
 
-MultiplexerJobStatus SecureSocket::serviceConnect(ISocketMultiplexerJob* job,
-                                                  bool read, bool write, bool error)
+MultiplexerJobStatus
+SecureSocket::serviceConnect(ISocketMultiplexerJob* job, bool read, bool write, bool error)
 {
-    (void) job;
-    (void) read;
-    (void) write;
-    (void) error;
+    (void)job;
+    (void)read;
+    (void)write;
+    (void)error;
 
     std::lock_guard<std::mutex> lock(tcp_mutex_);
 
@@ -762,7 +769,7 @@ MultiplexerJobStatus SecureSocket::serviceConnect(ISocketMultiplexerJob* job,
 
     // If status < 0, error happened
     if (status < 0) {
-        return {false, {}};
+        return { false, {} };
     }
 
     // If status > 0, success
@@ -772,21 +779,21 @@ MultiplexerJobStatus SecureSocket::serviceConnect(ISocketMultiplexerJob* job,
     }
 
     // Retry case
-    return {
-        true,
-        std::make_unique<TSocketMultiplexerMethodJob>([this](auto j, auto r, auto w, auto e)
-                                                      { return serviceConnect(j, r, w, e); },
-                                                      getSocket(), isReadable(), isWritable())
-    };
+    return { true,
+             std::make_unique<TSocketMultiplexerMethodJob>(
+               [this](auto j, auto r, auto w, auto e) { return serviceConnect(j, r, w, e); },
+               getSocket(),
+               isReadable(),
+               isWritable()) };
 }
 
-MultiplexerJobStatus SecureSocket::serviceAccept(ISocketMultiplexerJob* job,
-                                                 bool read, bool write, bool error)
+MultiplexerJobStatus
+SecureSocket::serviceAccept(ISocketMultiplexerJob* job, bool read, bool write, bool error)
 {
-    (void) job;
-    (void) read;
-    (void) write;
-    (void) error;
+    (void)job;
+    (void)read;
+    (void)write;
+    (void)error;
 
     std::lock_guard<std::mutex> lock(tcp_mutex_);
 
@@ -796,9 +803,9 @@ MultiplexerJobStatus SecureSocket::serviceAccept(ISocketMultiplexerJob* job,
 #elif SYSAPI_UNIX
     status = secureAccept(getSocket()->m_fd);
 #endif
-        // If status < 0, error happened
+    // If status < 0, error happened
     if (status < 0) {
-        return {false, {}};
+        return { false, {} };
     }
 
     // If status > 0, success
@@ -808,20 +815,21 @@ MultiplexerJobStatus SecureSocket::serviceAccept(ISocketMultiplexerJob* job,
     }
 
     // Retry case
-    return {
-        true,
-        std::make_unique<TSocketMultiplexerMethodJob>([this](auto j, auto r, auto w, auto e)
-                                                      { return serviceAccept(j, r, w, e); },
-                                                      getSocket(), isReadable(), isWritable())
-    };
+    return { true,
+             std::make_unique<TSocketMultiplexerMethodJob>(
+               [this](auto j, auto r, auto w, auto e) { return serviceAccept(j, r, w, e); },
+               getSocket(),
+               isReadable(),
+               isWritable()) };
 }
 
 void
-showCipherStackDesc(STACK_OF(SSL_CIPHER) * stack) {
+showCipherStackDesc(STACK_OF(SSL_CIPHER) * stack)
+{
     char msg[kMsgSize];
     int i = 0;
-    for ( ; i < sk_SSL_CIPHER_num(stack) ; i++) {
-        const SSL_CIPHER * cipher = sk_SSL_CIPHER_value(stack,i);
+    for (; i < sk_SSL_CIPHER_num(stack); i++) {
+        const SSL_CIPHER* cipher = sk_SSL_CIPHER_value(stack, i);
 
         SSL_CIPHER_description(cipher, msg, kMsgSize);
 
@@ -831,7 +839,7 @@ showCipherStackDesc(STACK_OF(SSL_CIPHER) * stack) {
             msg[pos] = '\0';
         }
 
-        LOG_DEBUG1("%s",msg);
+        LOG_DEBUG1("%s", msg);
     }
 }
 
@@ -840,28 +848,26 @@ SecureSocket::showSecureCipherInfo()
 {
     // ssl_mutex_ is assumed to be acquired
 
-    STACK_OF(SSL_CIPHER) * sStack = SSL_get_ciphers(m_ssl->m_ssl);
+    STACK_OF(SSL_CIPHER)* sStack = SSL_get_ciphers(m_ssl->m_ssl);
 
     if (sStack == nullptr) {
         LOG_DEBUG1("local cipher list not available");
-    }
-    else {
+    } else {
         LOG_DEBUG1("available local ciphers:");
         showCipherStackDesc(sStack);
     }
 
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
-	// m_ssl->m_ssl->session->ciphers is not forward compatible,
-	// In future release of OpenSSL, it's not visible,
-    STACK_OF(SSL_CIPHER) * cStack = m_ssl->m_ssl->session->ciphers;
+    // m_ssl->m_ssl->session->ciphers is not forward compatible,
+    // In future release of OpenSSL, it's not visible,
+    STACK_OF(SSL_CIPHER)* cStack = m_ssl->m_ssl->session->ciphers;
 #else
-	// Use SSL_get_client_ciphers() for newer versions
-	STACK_OF(SSL_CIPHER) * cStack = SSL_get_client_ciphers(m_ssl->m_ssl);
+    // Use SSL_get_client_ciphers() for newer versions
+    STACK_OF(SSL_CIPHER)* cStack = SSL_get_client_ciphers(m_ssl->m_ssl);
 #endif
-	if (cStack == nullptr) {
+    if (cStack == nullptr) {
         LOG_DEBUG1("remote cipher list not available");
-    }
-    else {
+    } else {
         LOG_DEBUG1("available remote ciphers:");
         showCipherStackDesc(cStack);
     }
@@ -871,11 +877,11 @@ SecureSocket::showSecureCipherInfo()
 void
 SecureSocket::showSecureLibInfo()
 {
-    LOG_INFO("%s",SSLeay_version(SSLEAY_VERSION));
-    LOG_DEBUG1("openSSL : %s",SSLeay_version(SSLEAY_CFLAGS));
-    LOG_DEBUG1("openSSL : %s",SSLeay_version(SSLEAY_BUILT_ON));
-    LOG_DEBUG1("openSSL : %s",SSLeay_version(SSLEAY_PLATFORM));
-    LOG_DEBUG1("%s",SSLeay_version(SSLEAY_DIR));
+    LOG_INFO("%s", SSLeay_version(SSLEAY_VERSION));
+    LOG_DEBUG1("openSSL : %s", SSLeay_version(SSLEAY_CFLAGS));
+    LOG_DEBUG1("openSSL : %s", SSLeay_version(SSLEAY_BUILT_ON));
+    LOG_DEBUG1("openSSL : %s", SSLeay_version(SSLEAY_PLATFORM));
+    LOG_DEBUG1("%s", SSLeay_version(SSLEAY_DIR));
     return;
 }
 
@@ -890,13 +896,14 @@ SecureSocket::showSecureConnectInfo()
         char msg[kMsgSize];
         SSL_CIPHER_description(cipher, msg, kMsgSize);
         LOG_INFO("%s", msg);
-        }
+    }
     return;
 }
 
-void SecureSocket::handle_tcp_connected(const Event& event)
+void
+SecureSocket::handle_tcp_connected(const Event& event)
 {
-    (void) event;
+    (void)event;
 
     if (getSocket() == nullptr) {
         LOG_DEBUG("disregarding stale connect event");
