@@ -17,14 +17,14 @@
  */
 
 #include "inputleap/PlatformScreen.h"
-#include "inputleap/App.h"
+#include "inputleap/AppUtil.h"
 #include "inputleap/ArgsBase.h"
 
 namespace inputleap {
 
-PlatformScreen::PlatformScreen() :
-    m_draggingStarted(false),
-    m_fakeDraggingStarted(false)
+PlatformScreen::PlatformScreen()
+  : m_draggingStarted(false)
+  , m_fakeDraggingStarted(false)
 {
 }
 
@@ -53,14 +53,13 @@ PlatformScreen::setHalfDuplexMask(KeyModifierMask mask)
 }
 
 void
-PlatformScreen::fakeKeyDown(KeyID id, KeyModifierMask mask,
-                KeyButton button)
+PlatformScreen::fakeKeyDown(KeyID id, KeyModifierMask mask, KeyButton button)
 {
     getKeyState()->fakeKeyDown(id, mask, button);
 }
 
-bool PlatformScreen::fakeKeyRepeat(KeyID id, KeyModifierMask mask, std::int32_t count,
-                                   KeyButton button)
+bool
+PlatformScreen::fakeKeyRepeat(KeyID id, KeyModifierMask mask, std::int32_t count, KeyButton button)
 {
     return getKeyState()->fakeKeyRepeat(id, mask, count, button);
 }
@@ -101,7 +100,8 @@ PlatformScreen::pollActiveModifiers() const
     return getKeyState()->pollActiveModifiers();
 }
 
-std::int32_t PlatformScreen::pollActiveGroup() const
+std::int32_t
+PlatformScreen::pollActiveGroup() const
 {
     return getKeyState()->pollActiveGroup();
 }
@@ -115,15 +115,16 @@ PlatformScreen::pollPressedKeys(KeyButtonSet& pressedKeys) const
 bool
 PlatformScreen::isDraggingStarted()
 {
-    if (App::instance().argsBase().m_enableDragDrop) {
+    if (AppUtil::instance().app().argsBase().m_enableDragDrop) {
         return m_draggingStarted;
     }
     return false;
 }
 
-bool PlatformScreen::fakeMediaKey(KeyID id)
+bool
+PlatformScreen::fakeMediaKey(KeyID id)
 {
-    (void) id;
+    (void)id;
     return false;
 }
 

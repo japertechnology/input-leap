@@ -20,6 +20,7 @@
 
 #include "Fwd.h"
 #include "base/Fwd.h"
+#include <functional>
 #include <memory>
 
 namespace inputleap {
@@ -28,11 +29,12 @@ typedef int (*StartupFunc)(int, char**);
 
 class IArchTaskBarReceiver;
 
-class IApp {
-public:
+class IApp
+{
+  public:
     virtual ~IApp() {}
 
-    virtual void setByeFunc(void(*bye)(int)) = 0;
+    virtual void setByeFunc(std::function<void(int)> bye) = 0;
     virtual ArgsBase& argsBase() const = 0;
     virtual int standardStartup(int argc, char** argv) = 0;
     virtual int runInner(int argc, char** argv, ILogOutputter* outputter, StartupFunc startup) = 0;

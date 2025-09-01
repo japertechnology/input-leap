@@ -18,27 +18,28 @@
 
 #include "inputleap/ServerApp.h"
 
-#include "server/Server.h"
-#include "server/ClientListener.h"
-#include "server/ClientProxy.h"
-#include "server/PrimaryClient.h"
-#include "inputleap/ArgParser.h"
 #include "PlatformScreenLoggingWrapper.h"
-#include "inputleap/Screen.h"
-#include "inputleap/XScreen.h"
-#include "inputleap/ServerTaskBarReceiver.h"
-#include "inputleap/ServerArgs.h"
-#include "net/SocketMultiplexer.h"
-#include "net/TCPSocketFactory.h"
-#include "net/XSocket.h"
 #include "arch/Arch.h"
 #include "base/EventQueue.h"
 #include "base/EventQueueTimer.h"
-#include "base/log_outputters.h"
 #include "base/IEventQueue.h"
 #include "base/Log.h"
-#include "common/Version.h"
+#include "base/log_outputters.h"
 #include "common/DataDirectories.h"
+#include "common/Version.h"
+#include "inputleap/AppUtil.h"
+#include "inputleap/ArgParser.h"
+#include "inputleap/Screen.h"
+#include "inputleap/ServerArgs.h"
+#include "inputleap/ServerTaskBarReceiver.h"
+#include "inputleap/XScreen.h"
+#include "net/SocketMultiplexer.h"
+#include "net/TCPSocketFactory.h"
+#include "net/XSocket.h"
+#include "server/ClientListener.h"
+#include "server/ClientProxy.h"
+#include "server/PrimaryClient.h"
+#include "server/Server.h"
 
 #if SYSAPI_WIN32
 #include "arch/win32/ArchMiscWindows.h"
@@ -48,9 +49,9 @@
 #include "platform/MSWindowsScreen.h"
 #endif
 #if WINAPI_XWINDOWS
-#include <unistd.h>
-#include <signal.h>
 #include "platform/XWindowsScreen.h"
+#include <signal.h>
+#include <unistd.h>
 #endif
 #if WINAPI_LIBEI
 #include "platform/EiScreen.h"
@@ -63,27 +64,25 @@
 #include "platform/OSXDragSimulator.h"
 #endif
 
-#include <iostream>
-#include <stdio.h>
 #include <fstream>
+#include <iostream>
 #include <sstream>
+#include <stdio.h>
 
 namespace inputleap {
 
-ServerApp::ServerApp(IEventQueue* events, CreateTaskBarReceiverFunc createTaskBarReceiver) :
-    App(events, createTaskBarReceiver, new ServerArgs()),
-    m_serverState(kUninitialized),
-    server_screen_(nullptr),
-    m_primaryClient(nullptr),
-    m_listener(nullptr),
-    m_timer(nullptr),
-    listen_address_(nullptr)
+ServerApp::ServerApp(IEventQueue* events, CreateTaskBarReceiverFunc createTaskBarReceiver)
+  : App(events, createTaskBarReceiver, new ServerArgs())
+  , m_serverState(kUninitialized)
+  , server_screen_(nullptr)
+  , m_primaryClient(nullptr)
+  , m_listener(nullptr)
+  , m_timer(nullptr)
+  , listen_address_(nullptr)
 {
 }
 
-ServerApp::~ServerApp()
-{
-}
+ServerApp::~ServerApp() {}
 
 void
 ServerApp::parseArgs(int argc, const char* const* argv)
@@ -93,16 +92,14 @@ ServerApp::parseArgs(int argc, const char* const* argv)
 
     if (!result || args().m_shouldExit) {
         m_bye(kExitArgs);
-    }
-    else {
+    } else {
         if (!args().network_address.empty()) {
             try {
                 *listen_address_ = NetworkAddress(args().network_address, kDefaultPort);
                 listen_address_->resolve();
-            }
-            catch (XSocketAddress& e) {
-                LOG_PRINT("%s: %s" BYE,
-                    args().m_exename.c_str(), e.what(), args().m_exename.c_str());
+            } catch (XSocketAddress& e) {
+                LOG_PRINT(
+                  "%s: %s" BYE, args().m_exename.c_str(), e.what(), args().m_exename.c_str());
                 m_bye(kExitArgs);
             }
         }
@@ -119,16 +116,15 @@ ServerApp::help()
     }
 
     auto usr_config_path = (profile_path / inputleap::fs::u8path(CONFIG_NAME)).u8string();
-    auto sys_config_path = (inputleap::DataDirectories::systemconfig() /
-                            inputleap::fs::u8path(CONFIG_NAME)).u8string();
+    auto sys_config_path =
+      (inputleap::DataDirectories::systemconfig() / inputleap::fs::u8path(CONFIG_NAME)).u8string();
 
     std::ostringstream buffer;
     buffer << "Start the InputLeap server component. The server shares the keyboard &\n"
            << "mouse of the local machine with the connected clients based on the\n"
            << "configuration file.\n"
            << "\n"
-           << "Usage: " << args().m_exename
-           << " [--address <address>]"
+           << "Usage: " << args().m_exename << " [--address <address>]"
            << " [--config <pathname>]"
 #ifdef WINAPI_XWINDOWS
            << " [--use-x11] [--display <display>]"
@@ -136,9 +132,7 @@ ServerApp::help()
 #ifdef WINAPI_LIBEI
            << " [--use-ei]"
 #endif
-           << HELP_SYS_ARGS
-           << HELP_COMMON_ARGS
-           << "\n"
+           << HELP_SYS_ARGS << HELP_COMMON_ARGS << "\n"
            << "\n"
            << "Options:\n"
            << "  -a, --address <address>  listen for clients on the given address.\n"
@@ -156,9 +150,7 @@ ServerApp::help()
 #ifdef WINAPI_LIBEI
            << "      --use-ei             use the EI backend\n"
 #endif
-           << HELP_SYS_INFO
-           << HELP_COMMON_INFO_2
-           << "\n"
+           << HELP_SYS_INFO << HELP_COMMON_INFO_2 << "\n"
            << "Default options are marked with a *\n"
            << "\n"
            << "The argument for --address is of the form: [<hostname>][:<port>].  The\n"
@@ -178,11 +170,12 @@ ServerApp::help()
 void
 ServerApp::reloadSignalHandler(Arch::ESignal, void*)
 {
-    IEventQueue* events = App::instance().getEvents();
+    IEventQueue* events = AppUtil::instance().app().getEvents();
     events->add_event(EventType::SERVER_APP_RELOAD_CONFIG, events->getSystemTarget());
 }
 
-void ServerApp::reload_config()
+void
+ServerApp::reload_config()
 {
     LOG_DEBUG("reload configuration");
     if (loadConfig(args().m_configFile)) {
@@ -213,21 +206,11 @@ ServerApp::loadConfig()
         };
 
         std::vector<PathConfig> path_configs = {
-            {
-                inputleap::DataDirectories::profile(),
-                CONFIG_NAME,
-                false
-            },
-            {
-                inputleap::DataDirectories::profile(),
-                ".input-leap.conf", // used before 3.0.0
-                true
-            },
-            {
-                inputleap::DataDirectories::systemconfig(),
-                CONFIG_NAME,
-                false
-            }
+            { inputleap::DataDirectories::profile(), CONFIG_NAME, false },
+            { inputleap::DataDirectories::profile(),
+              ".input-leap.conf", // used before 3.0.0
+              true },
+            { inputleap::DataDirectories::systemconfig(), CONFIG_NAME, false }
         };
 
         for (const auto& path_config : path_configs) {
@@ -236,10 +219,11 @@ ServerApp::loadConfig()
                 path /= inputleap::fs::u8path(path_config.filename);
                 if (loadConfig(path.u8string())) {
                     if (path_config.deprecated) {
-                        LOG_PRINT("%s: Loading config from deprecated path %s, please use %s",
-                                  args().m_exename.c_str(),
-                                  path.u8string().c_str(),
-                                  (path_configs[0].root / path_configs[0].filename).u8string().c_str());
+                        LOG_PRINT(
+                          "%s: Loading config from deprecated path %s, please use %s",
+                          args().m_exename.c_str(),
+                          path.u8string().c_str(),
+                          (path_configs[0].root / path_configs[0].filename).u8string().c_str());
                     }
                     loaded = true;
                     args().m_configFile = path.u8string();
@@ -255,7 +239,8 @@ ServerApp::loadConfig()
     }
 }
 
-bool ServerApp::loadConfig(const std::string& pathname)
+bool
+ServerApp::loadConfig(const std::string& pathname)
 {
     try {
         // load configuration
@@ -265,30 +250,29 @@ bool ServerApp::loadConfig(const std::string& pathname)
             // report failure to open configuration as a debug message
             // since we try several paths and we expect some to be
             // missing.
-            LOG_DEBUG("cannot open configuration \"%s\"",
-                pathname.c_str());
+            LOG_DEBUG("cannot open configuration \"%s\"", pathname.c_str());
             return false;
         }
         configStream >> *args().m_config;
         LOG_DEBUG("configuration read successfully");
         return true;
-    }
-    catch (XConfigRead& e) {
+    } catch (XConfigRead& e) {
         // report error in configuration file
-        LOG_ERR("cannot read configuration \"%s\": %s",
-            pathname.c_str(), e.what());
+        LOG_ERR("cannot read configuration \"%s\": %s", pathname.c_str(), e.what());
     }
     return false;
 }
 
-void ServerApp::force_reconnect()
+void
+ServerApp::force_reconnect()
 {
     if (server_) {
         server_->disconnect();
     }
 }
 
-void ServerApp::handle_client_connected(const Event&, ClientListener* listener)
+void
+ServerApp::handle_client_connected(const Event&, ClientListener* listener)
 {
     ClientProxy* client = listener->getNextClient();
     if (client != nullptr) {
@@ -297,7 +281,8 @@ void ServerApp::handle_client_connected(const Event&, ClientListener* listener)
     }
 }
 
-void ServerApp::handle_clients_disconnected(const Event&)
+void
+ServerApp::handle_clients_disconnected(const Event&)
 {
     m_events->add_event(EventType::QUIT);
 }
@@ -315,10 +300,11 @@ ServerApp::closeServer(Server* server)
     // wait for clients to disconnect for up to timeout seconds
     double timeout = 3.0;
     EventQueueTimer* timer = m_events->newOneShotTimer(timeout, nullptr);
-    m_events->add_handler(EventType::TIMER, timer,
-                          [this](const auto& e){ handle_clients_disconnected(e); });
-    m_events->add_handler(EventType::SERVER_DISCONNECTED, server,
-                          [this](const auto& e){ handle_clients_disconnected(e); });
+    m_events->add_handler(
+      EventType::TIMER, timer, [this](const auto& e) { handle_clients_disconnected(e); });
+    m_events->add_handler(EventType::SERVER_DISCONNECTED, server, [this](const auto& e) {
+        handle_clients_disconnected(e);
+    });
 
     m_events->loop();
 
@@ -343,10 +329,10 @@ ServerApp::updateStatus()
     updateStatus("");
 }
 
-void ServerApp::updateStatus(const std::string& msg)
+void
+ServerApp::updateStatus(const std::string& msg)
 {
-    if (m_taskBarReceiver)
-    {
+    if (m_taskBarReceiver) {
         m_taskBarReceiver->updateStatus(server_.get(), msg);
     }
 }
@@ -369,8 +355,7 @@ ServerApp::stopServer()
         server_.reset();
         m_listener = nullptr;
         m_serverState = kInitialized;
-    }
-    else if (m_serverState == kStarting) {
+    } else if (m_serverState == kStarting) {
         stopRetryTimer();
         m_serverState = kInitialized;
     }
@@ -384,26 +369,26 @@ ServerApp::closePrimaryClient(PrimaryClient* primaryClient)
     delete primaryClient;
 }
 
-void ServerApp::cleanupServer()
+void
+ServerApp::cleanupServer()
 {
     stopServer();
     if (m_serverState == kInitialized) {
         closePrimaryClient(m_primaryClient);
         m_primaryClient = nullptr;
         server_screen_.reset();
-        m_serverState   = kUninitialized;
-    }
-    else if (m_serverState == kInitializing ||
-        m_serverState == kInitializingToStart) {
-            stopRetryTimer();
-            m_serverState = kUninitialized;
+        m_serverState = kUninitialized;
+    } else if (m_serverState == kInitializing || m_serverState == kInitializingToStart) {
+        stopRetryTimer();
+        m_serverState = kUninitialized;
     }
     assert(m_primaryClient == nullptr);
     assert(server_screen_.get() == nullptr);
     assert(m_serverState == kUninitialized);
 }
 
-void ServerApp::handle_retry()
+void
+ServerApp::handle_retry()
 {
     // discard old timer
     assert(m_timer != nullptr);
@@ -411,47 +396,47 @@ void ServerApp::handle_retry()
 
     // try initializing/starting the server again
     switch (m_serverState) {
-    case kUninitialized:
-    case kInitialized:
-    case kStarted:
-        assert(0 && "bad internal server state");
-        break;
+        case kUninitialized:
+        case kInitialized:
+        case kStarted:
+            assert(0 && "bad internal server state");
+            break;
 
-    case kInitializing:
-        LOG_DEBUG1("retry server initialization");
-        m_serverState = kUninitialized;
-        if (!initServer()) {
-            m_events->add_event(EventType::QUIT);
-        }
-        break;
+        case kInitializing:
+            LOG_DEBUG1("retry server initialization");
+            m_serverState = kUninitialized;
+            if (!initServer()) {
+                m_events->add_event(EventType::QUIT);
+            }
+            break;
 
-    case kInitializingToStart:
-        LOG_DEBUG1("retry server initialization");
-        m_serverState = kUninitialized;
-        if (!initServer()) {
-            m_events->add_event(EventType::QUIT);
-        }
-        else if (m_serverState == kInitialized) {
-            LOG_DEBUG1("starting server");
+        case kInitializingToStart:
+            LOG_DEBUG1("retry server initialization");
+            m_serverState = kUninitialized;
+            if (!initServer()) {
+                m_events->add_event(EventType::QUIT);
+            } else if (m_serverState == kInitialized) {
+                LOG_DEBUG1("starting server");
+                if (!startServer()) {
+                    m_events->add_event(EventType::QUIT);
+                }
+            }
+            break;
+
+        case kStarting:
+            LOG_DEBUG1("retry starting server");
+            m_serverState = kInitialized;
             if (!startServer()) {
                 m_events->add_event(EventType::QUIT);
             }
-        }
-        break;
-
-    case kStarting:
-        LOG_DEBUG1("retry starting server");
-        m_serverState = kInitialized;
-        if (!startServer()) {
-            m_events->add_event(EventType::QUIT);
-        }
-        break;
-    default:
-        break;
+            break;
+        default:
+            break;
     }
 }
 
-bool ServerApp::initServer()
+bool
+ServerApp::initServer()
 {
     // skip if already initialized or initializing
     if (m_serverState != kUninitialized) {
@@ -463,25 +448,22 @@ bool ServerApp::initServer()
     try {
         std::string name = args().m_config->getCanonicalName(args().m_name);
         auto server_screen = open_server_screen();
-        primaryClient   = openPrimaryClient(name, server_screen.get());
+        primaryClient = openPrimaryClient(name, server_screen.get());
         m_primaryClient = primaryClient;
-        m_serverState   = kInitialized;
+        m_serverState = kInitialized;
         updateStatus();
         server_screen_ = std::move(server_screen);
         return true;
-    }
-    catch (XScreenUnavailable& e) {
+    } catch (XScreenUnavailable& e) {
         LOG_WARN("primary screen unavailable: %s", e.what());
         closePrimaryClient(primaryClient);
         updateStatus(std::string("primary screen unavailable: ") + e.what());
         retryTime = e.getRetryTime();
-    }
-    catch (XScreenOpenFailure& e) {
+    } catch (XScreenOpenFailure& e) {
         LOG_CRIT("failed to start server: %s", e.what());
         closePrimaryClient(primaryClient);
         return false;
-    }
-    catch (XBase& e) {
+    } catch (XBase& e) {
         LOG_CRIT("failed to start server: %s", e.what());
         closePrimaryClient(primaryClient);
         return false;
@@ -492,34 +474,37 @@ bool ServerApp::initServer()
         assert(m_timer == nullptr);
         LOG_DEBUG("retry in %.0f seconds", retryTime);
         m_timer = m_events->newOneShotTimer(retryTime, nullptr);
-        m_events->add_handler(EventType::TIMER, m_timer,
-                              [this](const auto& e){ handle_retry(); });
+        m_events->add_handler(EventType::TIMER, m_timer, [this](const auto& e) { handle_retry(); });
         m_serverState = kInitializing;
         return true;
-    }
-    else {
+    } else {
         // don't try again
         return false;
     }
 }
 
-std::unique_ptr<Screen> ServerApp::open_server_screen()
+std::unique_ptr<Screen>
+ServerApp::open_server_screen()
 {
     auto screen = create_screen();
     if (!argsBase().m_dropTarget.empty()) {
         screen->setDropTarget(argsBase().m_dropTarget);
     }
     screen->setEnableDragDrop(argsBase().m_enableDragDrop);
-    m_events->add_handler(EventType::SCREEN_ERROR, screen->get_event_target(),
-                          [this](const auto& e){ handle_screen_error(); });
-    m_events->add_handler(EventType::SCREEN_SUSPEND, screen->get_event_target(),
-                          [this](const auto& e){ handle_suspend(); });
-    m_events->add_handler(EventType::SCREEN_RESUME, screen->get_event_target(),
-                          [this](const auto& e){ handle_resume(); });
+    m_events->add_handler(EventType::SCREEN_ERROR,
+                          screen->get_event_target(),
+                          [this](const auto& e) { handle_screen_error(); });
+    m_events->add_handler(EventType::SCREEN_SUSPEND,
+                          screen->get_event_target(),
+                          [this](const auto& e) { handle_suspend(); });
+    m_events->add_handler(EventType::SCREEN_RESUME,
+                          screen->get_event_target(),
+                          [this](const auto& e) { handle_resume(); });
     return screen;
 }
 
-static const char* family_string(IArchNetwork::EAddressFamily family)
+static const char*
+family_string(IArchNetwork::EAddressFamily family)
 {
     if (family == IArchNetwork::kINET)
         return "IPv4";
@@ -556,7 +541,7 @@ ServerApp::startServer()
     try {
         auto listenAddress = args().m_config->get_listen_address();
         auto family = family_string(ARCH->getAddrFamily(listenAddress.getAddress()));
-        listener   = openClientListener(listenAddress);
+        listener = openClientListener(listenAddress);
         server_ = open_server(*args().m_config, m_primaryClient);
         listener->setServer(server_.get());
         server_->setListener(listener);
@@ -568,14 +553,12 @@ ServerApp::startServer()
         LOG_PRINT("started server (%s), waiting for clients", family);
         m_serverState = kStarted;
         return true;
-    }
-    catch (XSocketAddressInUse& e) {
+    } catch (XSocketAddressInUse& e) {
         LOG_ERR("cannot listen for clients: %s", e.what());
         closeClientListener(listener);
         updateStatus(std::string("cannot listen for clients: ") + e.what());
         retryTime = 1.0;
-    }
-    catch (XBase& e) {
+    } catch (XBase& e) {
         LOG_CRIT("failed to start server: %s", e.what());
         closeClientListener(listener);
         return false;
@@ -586,18 +569,17 @@ ServerApp::startServer()
         assert(m_timer == nullptr);
         LOG_DEBUG("retry in %.0f seconds", retryTime);
         m_timer = m_events->newOneShotTimer(retryTime, nullptr);
-        m_events->add_handler(EventType::TIMER, m_timer,
-                              [this](const auto& e){ handle_retry(); });
+        m_events->add_handler(EventType::TIMER, m_timer, [this](const auto& e) { handle_retry(); });
         m_serverState = kStarting;
         return true;
-    }
-    else {
+    } else {
         // don't try again
         return false;
     }
 }
 
-std::unique_ptr<Screen> ServerApp::create_screen()
+std::unique_ptr<Screen>
+ServerApp::create_screen()
 {
     auto plat_screen = create_platform_screen();
     if (Log::getInstance()->getFilter() >= kDEBUG2) {
@@ -606,20 +588,22 @@ std::unique_ptr<Screen> ServerApp::create_screen()
     return std::make_unique<Screen>(std::move(plat_screen), m_events);
 }
 
-PrimaryClient* ServerApp::openPrimaryClient(const std::string& name, inputleap::Screen* screen)
+PrimaryClient*
+ServerApp::openPrimaryClient(const std::string& name, inputleap::Screen* screen)
 {
     LOG_DEBUG1("creating primary screen");
     return new PrimaryClient(name, screen);
-
 }
 
-void ServerApp::handle_screen_error()
+void
+ServerApp::handle_screen_error()
 {
     LOG_CRIT("error on screen");
     m_events->add_event(EventType::QUIT);
 }
 
-void ServerApp::handle_suspend()
+void
+ServerApp::handle_suspend()
 {
     if (!m_suspended) {
         LOG_INFO("suspend");
@@ -628,7 +612,8 @@ void ServerApp::handle_suspend()
     }
 }
 
-void ServerApp::handle_resume()
+void
+ServerApp::handle_resume()
 {
     if (m_suspended) {
         LOG_INFO("resume");
@@ -648,60 +633,68 @@ ServerApp::openClientListener(const NetworkAddress& address)
         }
     }
 
-    ClientListener* listen = new ClientListener(
-        address,
-        std::make_unique<TCPSocketFactory>(m_events, getSocketMultiplexer()),
-        m_events, security_level);
+    ClientListener* listen =
+      new ClientListener(address,
+                         std::make_unique<TCPSocketFactory>(m_events, getSocketMultiplexer()),
+                         m_events,
+                         security_level);
 
-    m_events->add_handler(EventType::CLIENT_LISTENER_CONNECTED, listen,
-                          [this, listen](const auto& e){ handle_client_connected(e, listen); });
+    m_events->add_handler(EventType::CLIENT_LISTENER_CONNECTED,
+                          listen,
+                          [this, listen](const auto& e) { handle_client_connected(e, listen); });
 
     return listen;
 }
 
-std::unique_ptr<Server> ServerApp::open_server(Config& config, PrimaryClient* primaryClient)
+std::unique_ptr<Server>
+ServerApp::open_server(Config& config, PrimaryClient* primaryClient)
 {
-    auto server = std::make_unique<Server>(config, primaryClient, server_screen_.get(), m_events,
-                                           args());
+    auto server =
+      std::make_unique<Server>(config, primaryClient, server_screen_.get(), m_events, args());
 
-    m_events->add_handler(EventType::SERVER_DISCONNECTED, server.get(),
-                          [this](const auto& e){ handle_no_clients(); });
-    m_events->add_handler(EventType::SERVER_SCREEN_SWITCHED, server.get(),
-                          [this](const auto& e){ handle_screen_switched(e); });
+    m_events->add_handler(
+      EventType::SERVER_DISCONNECTED, server.get(), [this](const auto& e) { handle_no_clients(); });
+    m_events->add_handler(EventType::SERVER_SCREEN_SWITCHED, server.get(), [this](const auto& e) {
+        handle_screen_switched(e);
+    });
 
     return server;
 }
 
-void ServerApp::handle_no_clients()
+void
+ServerApp::handle_no_clients()
 {
     updateStatus();
 }
 
-void ServerApp::handle_screen_switched(const Event& e)
+void
+ServerApp::handle_screen_switched(const Event& e)
 {
-    #ifdef WINAPI_XWINDOWS
-        const auto& info = e.get_data_as<Server::SwitchToScreenInfo>();
+#ifdef WINAPI_XWINDOWS
+    const auto& info = e.get_data_as<Server::SwitchToScreenInfo>();
 
-        if (!args().m_screenChangeScript.empty()) {
-            LOG_INFO("Running shell script for screen \"%s\"", info.m_screen.c_str());
+    if (!args().m_screenChangeScript.empty()) {
+        LOG_INFO("Running shell script for screen \"%s\"", info.m_screen.c_str());
 
-            signal(SIGCHLD, SIG_IGN);
+        signal(SIGCHLD, SIG_IGN);
 
-            if (!access(args().m_screenChangeScript.c_str(), X_OK)) {
-                pid_t pid = fork();
-                if (pid == 0) {
-                    execl(args().m_screenChangeScript.c_str(),args().m_screenChangeScript.c_str(),
-                          info.m_screen.c_str(),nullptr);
-                    exit(0);
-                } else if (pid < 0) {
-                    LOG_ERR("Script forking error");
-                    exit(1);
-                }
-            } else {
-                LOG_ERR("Script not accessible \"%s\"", args().m_screenChangeScript.c_str());
+        if (!access(args().m_screenChangeScript.c_str(), X_OK)) {
+            pid_t pid = fork();
+            if (pid == 0) {
+                execl(args().m_screenChangeScript.c_str(),
+                      args().m_screenChangeScript.c_str(),
+                      info.m_screen.c_str(),
+                      nullptr);
+                exit(0);
+            } else if (pid < 0) {
+                LOG_ERR("Script forking error");
+                exit(1);
             }
+        } else {
+            LOG_ERR("Script not accessible \"%s\"", args().m_screenChangeScript.c_str());
         }
-    #endif
+    }
+#endif
 }
 
 int
@@ -722,8 +715,7 @@ ServerApp::mainLoop()
     // the default.
     if (listen_address_->isValid()) {
         args().m_config->set_listen_address(*listen_address_);
-    }
-    else if (!args().m_config->get_listen_address().isValid()) {
+    } else if (!args().m_config->get_listen_address().isValid()) {
         args().m_config->set_listen_address(NetworkAddress(kDefaultPort));
     }
 
@@ -745,18 +737,21 @@ ServerApp::mainLoop()
 
     // handle hangup signal by reloading the server's configuration
     ARCH->setSignalHandler(Arch::kHANGUP, &reloadSignalHandler, nullptr);
-    m_events->add_handler(EventType::SERVER_APP_RELOAD_CONFIG, m_events->getSystemTarget(),
-                          [this](const auto& e){ reload_config(); });
+    m_events->add_handler(EventType::SERVER_APP_RELOAD_CONFIG,
+                          m_events->getSystemTarget(),
+                          [this](const auto& e) { reload_config(); });
 
     // handle force reconnect event by disconnecting clients.  they'll
     // reconnect automatically.
-    m_events->add_handler(EventType::SERVER_APP_FORCE_RECONNECT, m_events->getSystemTarget(),
-                          [this](const auto& e){ force_reconnect(); });
+    m_events->add_handler(EventType::SERVER_APP_FORCE_RECONNECT,
+                          m_events->getSystemTarget(),
+                          [this](const auto& e) { force_reconnect(); });
 
     // to work around the sticky meta keys problem, we'll give users
     // the option to reset the state of InputLeap server.
-    m_events->add_handler(EventType::SERVER_APP_RESET_SERVER, m_events->getSystemTarget(),
-                          [this](const auto& e){ reset_server(); });
+    m_events->add_handler(EventType::SERVER_APP_RESET_SERVER,
+                          m_events->getSystemTarget(),
+                          [this](const auto& e) { reset_server(); });
 
     // run event loop.  if startServer() failed we're supposed to retry
     // later.  the timer installed by startServer() will take care of
@@ -765,11 +760,10 @@ ServerApp::mainLoop()
 
 #if defined(MAC_OS_X_VERSION_10_7)
 
-    Thread thread([this](){ run_events_loop(); });
+    Thread thread([this]() { run_events_loop(); });
 
     // wait until carbon loop is ready
-    OSXScreen* screen = dynamic_cast<OSXScreen*>(
-        server_screen_->getPlatformScreen());
+    OSXScreen* screen = dynamic_cast<OSXScreen*>(server_screen_->getPlatformScreen());
     screen->waitForCarbonLoop();
 
     runCocoaApp();
@@ -794,7 +788,8 @@ ServerApp::mainLoop()
     return kExitSuccess;
 }
 
-void ServerApp::reset_server()
+void
+ServerApp::reset_server()
 {
     LOG_DEBUG1("resetting server");
     stopServer();
@@ -818,8 +813,7 @@ ServerApp::runInner(int argc, char** argv, ILogOutputter* outputter, StartupFunc
     // run
     int result = startup(argc, argv);
 
-    if (m_taskBarReceiver)
-    {
+    if (m_taskBarReceiver) {
         // done with task bar receiver
         delete m_taskBarReceiver;
     }
@@ -829,8 +823,10 @@ ServerApp::runInner(int argc, char** argv, ILogOutputter* outputter, StartupFunc
     return result;
 }
 
-int daemonMainLoopStatic(int argc, const char** argv) {
-    return ServerApp::instance().daemonMainLoop(argc, argv);
+int
+daemonMainLoopStatic(int argc, const char** argv)
+{
+    return static_cast<ServerApp&>(AppUtil::instance().app()).daemonMainLoop(argc, argv);
 }
 
 int
@@ -841,8 +837,7 @@ ServerApp::standardStartup(int argc, char** argv)
     // daemonize if requested
     if (args().m_daemon) {
         return ARCH->daemonize(daemonName(), daemonMainLoopStatic);
-    }
-    else {
+    } else {
         return mainLoop();
     }
 }
@@ -887,16 +882,17 @@ ServerApp::startNode()
     }
 }
 
-std::unique_ptr<IPlatformScreen> ServerApp::create_platform_screen()
+std::unique_ptr<IPlatformScreen>
+ServerApp::create_platform_screen()
 {
 #if WINAPI_MSWINDOWS
-    return std::make_unique<MSWindowsScreen>(true, args().m_noHooks, args().m_stopOnDeskSwitch,
-                                             m_events);
+    return std::make_unique<MSWindowsScreen>(
+      true, args().m_noHooks, args().m_stopOnDeskSwitch, m_events);
 #endif
 #if WINAPI_XWINDOWS
     if (args().use_x11) {
-        return std::make_unique<XWindowsScreen>(new XWindowsImpl(), args().m_display, true, 0,
-                                                m_events);
+        return std::make_unique<XWindowsScreen>(
+          new XWindowsImpl(), args().m_display, true, 0, m_events);
     }
 #endif
 #if WINAPI_LIBEI

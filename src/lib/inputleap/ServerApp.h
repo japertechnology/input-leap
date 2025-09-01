@@ -18,22 +18,23 @@
 
 #pragma once
 
-#include "inputleap/ArgsBase.h"
-#include "inputleap/App.h"
-#include "inputleap/Fwd.h"
-#include "base/Fwd.h"
-#include "server/Config.h"
-#include "net/NetworkAddress.h"
+#include "ServerArgs.h"
 #include "arch/Arch.h"
 #include "arch/IArchMultithread.h"
 #include "base/EventTypes.h"
-#include "ServerArgs.h"
+#include "base/Fwd.h"
+#include "inputleap/App.h"
+#include "inputleap/ArgsBase.h"
+#include "inputleap/Fwd.h"
+#include "net/NetworkAddress.h"
+#include "server/Config.h"
 
 #include <map>
 
 namespace inputleap {
 
-enum EServerState {
+enum EServerState
+{
     kUninitialized,
     kInitializing,
     kInitializingToStart,
@@ -45,8 +46,9 @@ enum EServerState {
 class Server;
 class ClientListener;
 
-class ServerApp : public App {
-public:
+class ServerApp : public App
+{
+  public:
     ServerApp(IEventQueue* events, CreateTaskBarReceiverFunc createTaskBarReceiver);
     ~ServerApp() override;
 
@@ -99,8 +101,6 @@ public:
     int foregroundStartup(int argc, char** argv) override;
     void startNode() override;
 
-    static ServerApp& instance() { return static_cast<ServerApp&>(App::instance()); }
-
     Server* getServerPtr() { return server_.get(); }
 
     std::unique_ptr<Server> server_;
@@ -111,7 +111,7 @@ public:
     EventQueueTimer* m_timer;
     NetworkAddress* listen_address_;
 
-private:
+  private:
     std::unique_ptr<IPlatformScreen> create_platform_screen();
     void handle_screen_switched(const Event& event);
 };
