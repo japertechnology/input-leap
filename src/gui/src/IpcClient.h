@@ -23,6 +23,7 @@
 #include <QtEndian>
 
 #include "ElevateMode.h"
+#include "AppConnectionState.h"
 
 class QTcpSocket;
 class IpcReader;
@@ -74,6 +75,7 @@ Q_SIGNALS:
     void readLogLine(const QString& text);
     void infoMessage(const QString& text);
     void errorMessage(const QString& text);
+    void connectionStateChanged(AppConnectionState state);
 
 private:
     QTcpSocket* m_Socket;

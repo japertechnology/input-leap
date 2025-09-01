@@ -32,6 +32,7 @@ namespace inputleap {
 class IpcMessage;
 class IpcCommandMessage;
 class IpcHelloMessage;
+class IpcConnectionStateMessage;
 class IStream;
 
 class IpcClientProxy : public EventTarget {

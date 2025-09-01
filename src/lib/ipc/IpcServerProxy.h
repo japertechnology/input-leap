@@ -28,6 +28,7 @@ namespace inputleap {
 class IStream;
 class IpcMessage;
 class IpcLogLineMessage;
+class IpcConnectionStateMessage;
 
 class IpcServerProxy : public EventTarget {
     friend class IpcClient;
@@ -41,6 +42,7 @@ private:
 
     void handle_data();
     IpcLogLineMessage parseLogLine();
+    IpcConnectionStateMessage parseConnectionState();
     void disconnect();
 
 private:

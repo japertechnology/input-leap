@@ -354,6 +354,9 @@ void DaemonApp::handle_ipc_message(const Event& e)
 
             m_ipcLogOutputter->notifyBuffer();
             break;
+        case kIpcConnectionState:
+            m_ipcServer->send(m, kIpcClientGui);
+            break;
     }
 }
 

@@ -26,6 +26,7 @@
 enum qIpcMessageType {
     kIpcHello,
     kIpcLogLine,
+    kIpcConnectionState,
     kIpcCommand,
     kIpcShutdown,
 };
@@ -38,5 +39,6 @@ enum qIpcClientType {
 
 extern const char*        kIpcMsgHello;
 extern const char*        kIpcMsgLogLine;
+extern const char*        kIpcMsgConnectionState;
 extern const char*        kIpcMsgCommand;
 extern const char*        kIpcMsgShutdown;

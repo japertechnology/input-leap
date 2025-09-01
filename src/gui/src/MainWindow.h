@@ -143,7 +143,6 @@ public slots:
         bool clientArgs(QStringList& args, QString& app);
         bool serverArgs(QStringList& args, QString& app);
         void setStatus(const QString& status);
-        void updateFromLogLine(const QString& line);
         QString getIPAddresses();
         void stopService();
         void stopDesktop();
@@ -158,7 +157,6 @@ public slots:
         bool isBonjourRunning();
         void downloadBonjour();
         void promptAutoConfig();
-        void checkConnected(const QString& line);
         void checkFingerprint(const QString& line);
         void restart_cmd_app();
         void proofreadInfo();

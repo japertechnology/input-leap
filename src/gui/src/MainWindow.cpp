@@ -156,6 +156,7 @@ MainWindow::MainWindow(QSettings& settings, AppConfig& appConfig) :
     connect(&m_IpcClient, &IpcClient::readLogLine, this, &MainWindow::appendLogRaw);
     connect(&m_IpcClient, &IpcClient::errorMessage, this, &MainWindow::appendLogError);
     connect(&m_IpcClient, &IpcClient::infoMessage, this, &MainWindow::appendLogInfo);
+    connect(&m_IpcClient, &IpcClient::connectionStateChanged, this, &MainWindow::set_connection_state);
     m_IpcClient.connectToHost();
 #endif
 
@@ -446,36 +447,7 @@ void MainWindow::appendLogRaw(const QString& text)
     for (const auto& line : lines) {
         if (!line.isEmpty()) {
             m_pLogWindow->appendRaw(line);
-            updateFromLogLine(line);
-        }
-    }
-}
-
-void MainWindow::updateFromLogLine(const QString &line)
-{
-    // TODO: this code makes Andrew cry
-    checkConnected(line);
-    checkFingerprint(line);
-}
-
-void MainWindow::checkConnected(const QString& line)
-{
-    // TODO: implement ipc connection state messages to replace this hack.
-    if (line.contains("started server") ||
-        line.contains("connected to server") ||
-        line.contains("server status: active"))
-    {
-        set_connection_state(AppConnectionState::CONNECTED);
-
-        if (!appConfig().startedBefore() && isVisible()) {
-                QMessageBox::information(
-                    this, "InputLeap",
-                    tr("InputLeap is now connected. You can close the "
-                    "config window and InputLeap will remain connected in "
-                    "the background."));
-
-            appConfig().setStartedBefore(true);
-            appConfig().saveSettings();
+            checkFingerprint(line);
         }
     }
 }
@@ -968,6 +940,15 @@ void MainWindow::set_connection_state(AppConnectionState state)
     set_icon(state);
 
     connection_state_ = state;
+
+    if (state == AppConnectionState::CONNECTED && !appConfig().startedBefore() && isVisible()) {
+        QMessageBox::information(
+            this, "InputLeap",
+            tr("InputLeap is now connected. You can close the config window and InputLeap will remain connected in the background."));
+
+        appConfig().setStartedBefore(true);
+        appConfig().saveSettings();
+    }
 }
 
 void MainWindow::setVisible(bool visible)
