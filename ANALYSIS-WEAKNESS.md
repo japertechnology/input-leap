@@ -53,6 +53,6 @@
 ### Singleton and global state usage
 - **Severity**: Low
 - **Affected Files/Locations**: src/lib/inputleap/App.h
-- **Description**: The global `App::s_instance` singleton increases coupling and hinders unit testing by enforcing a single global state.
-- **Recommendation**: Reduce reliance on singletons by allowing dependency injection or multiple instances where appropriate to improve modularity and testability.
+- **Description**: The former global `App::s_instance` singleton increased coupling and hindered unit testing by enforcing a single global state. This has been replaced with dependency injection via `AppUtil`.
+- **Recommendation**: Continue reducing reliance on singletons by allowing dependency injection or multiple instances where appropriate to improve modularity and testability.
 

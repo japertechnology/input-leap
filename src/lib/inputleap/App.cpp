@@ -19,18 +19,18 @@
 #include "inputleap/App.h"
 #include "Screen.h"
 
+#include "base/EventQueue.h"
 #include "base/Log.h"
-#include "common/Version.h"
-#include "inputleap/protocol_types.h"
 #include "base/XBase.h"
 #include "base/log_outputters.h"
-#include "inputleap/Exceptions.h"
-#include "inputleap/ArgsBase.h"
-#include "ipc/IpcServerProxy.h"
-#include "ipc/IpcMessage.h"
-#include "ipc/Ipc.h"
-#include "base/EventQueue.h"
 #include "common/DataDirectories.h"
+#include "common/Version.h"
+#include "inputleap/ArgsBase.h"
+#include "inputleap/Exceptions.h"
+#include "inputleap/protocol_types.h"
+#include "ipc/Ipc.h"
+#include "ipc/IpcMessage.h"
+#include "ipc/IpcServerProxy.h"
 
 #if SYSAPI_WIN32
 #include "base/IEventQueue.h"
@@ -49,27 +49,22 @@
 
 namespace inputleap {
 
-App* App::s_instance = nullptr;
-
-App::App(IEventQueue* events, CreateTaskBarReceiverFunc createTaskBarReceiver, ArgsBase* args) :
-    m_bye(&exit),
-    m_taskBarReceiver(nullptr),
-    m_suspended(false),
-    m_events(events),
-    m_args(args),
-    m_fileLog(nullptr),
-    m_createTaskBarReceiver(createTaskBarReceiver),
-    m_appUtil(events),
-    m_ipcClient(nullptr),
-    m_socketMultiplexer(nullptr)
+App::App(IEventQueue* events, CreateTaskBarReceiverFunc createTaskBarReceiver, ArgsBase* args)
+  : m_bye(&exit)
+  , m_taskBarReceiver(nullptr)
+  , m_suspended(false)
+  , m_events(events)
+  , m_args(args)
+  , m_fileLog(nullptr)
+  , m_createTaskBarReceiver(createTaskBarReceiver)
+  , m_appUtil(events)
+  , m_ipcClient(nullptr)
+  , m_socketMultiplexer(nullptr)
 {
-    assert(s_instance == nullptr);
-    s_instance = this;
 }
 
 App::~App()
 {
-    s_instance = nullptr;
     delete m_args;
 }
 
@@ -77,7 +72,8 @@ void
 App::version()
 {
     std::cout << argsBase().m_exename << " " << kVersion << "\n";
-    std::cout <<"Protocol version " << kProtocolMajorVersion << "." << kProtocolMinorVersion << "\n";
+    std::cout << "Protocol version " << kProtocolMajorVersion << "." << kProtocolMinorVersion
+              << "\n";
     std::cout << kCopyright << "\n";
 }
 
@@ -104,17 +100,14 @@ App::run(int argc, char** argv)
 
     try {
         result = appUtil().run(argc, argv);
-    }
-    catch (XExitApp& e) {
+    } catch (XExitApp& e) {
         // instead of showing a nasty error, just exit with the error code.
         // not sure if i like this behaviour, but it's probably better than
         // using the exit(int) function!
         result = e.getCode();
-    }
-    catch (std::exception& e) {
+    } catch (std::exception& e) {
         LOG_CRIT("An error occurred: %s\n", e.what());
-    }
-    catch (...) {
+    } catch (...) {
         LOG_CRIT("An unknown error occurred.\n");
     }
 
@@ -150,7 +143,7 @@ App::loggingFilterWarning()
     if (CLOG->getFilter() > CLOG->getConsoleMaxLevel()) {
         if (argsBase().m_logFile == nullptr) {
             LOG_WARN("log messages above %s are NOT sent to console (use file logging)",
-                CLOG->getFilterName(CLOG->getConsoleMaxLevel()));
+                     CLOG->getFilterName(CLOG->getConsoleMaxLevel()));
         }
     }
 }
@@ -166,7 +159,9 @@ App::initApp(int argc, const char** argv)
     // set log filter
     if (!CLOG->setFilter(argsBase().m_logFilter)) {
         LOG_PRINT("%s: unrecognized log level `%s'" BYE,
-            argsBase().m_exename.c_str(), argsBase().m_logFilter, argsBase().m_exename.c_str());
+                  argsBase().m_exename.c_str(),
+                  argsBase().m_logFilter,
+                  argsBase().m_exename.c_str());
         m_bye(kExitArgs);
     }
     loggingFilterWarning();
@@ -204,7 +199,8 @@ App::initIpcClient()
     m_ipcClient = new IpcClient(m_events, m_socketMultiplexer.get());
     m_ipcClient->connect();
 
-    m_events->add_handler(EventType::IPC_CLIENT_MESSAGE_RECEIVED, m_ipcClient,
+    m_events->add_handler(EventType::IPC_CLIENT_MESSAGE_RECEIVED,
+                          m_ipcClient,
                           [this](const auto& event) { handle_ipc_message(event); });
 }
 
@@ -216,7 +212,8 @@ App::cleanupIpcClient()
     delete m_ipcClient;
 }
 
-void App::handle_ipc_message(const Event& e)
+void
+App::handle_ipc_message(const Event& e)
 {
     const auto& m = e.get_data_as<IpcMessage>();
     if (m.type() == kIpcShutdown) {
@@ -225,7 +222,8 @@ void App::handle_ipc_message(const Event& e)
     }
 }
 
-void App::run_events_loop()
+void
+App::run_events_loop()
 {
     m_events->loop();
 
@@ -240,22 +238,20 @@ void App::run_events_loop()
 // MinimalApp
 //
 
-MinimalApp::MinimalApp() :
-    App(nullptr, nullptr, new ArgsBase())
+MinimalApp::MinimalApp()
+  : App(nullptr, nullptr, new ArgsBase())
 {
     m_arch.init();
     setEvents(m_events);
 }
 
-MinimalApp::~MinimalApp()
-{
-}
+MinimalApp::~MinimalApp() {}
 
 int
 MinimalApp::standardStartup(int argc, char** argv)
 {
-    (void) argc;
-    (void) argv;
+    (void)argc;
+    (void)argv;
 
     return 0;
 }
@@ -263,10 +259,10 @@ MinimalApp::standardStartup(int argc, char** argv)
 int
 MinimalApp::runInner(int argc, char** argv, ILogOutputter* outputter, StartupFunc startup)
 {
-    (void) argc;
-    (void) argv;
-    (void) outputter;
-    (void) startup;
+    (void)argc;
+    (void)argv;
+    (void)outputter;
+    (void)startup;
 
     return 0;
 }
@@ -285,13 +281,14 @@ MinimalApp::mainLoop()
 int
 MinimalApp::foregroundStartup(int argc, char** argv)
 {
-    (void) argc;
-    (void) argv;
+    (void)argc;
+    (void)argv;
 
     return 0;
 }
 
-std::unique_ptr<Screen> MinimalApp::create_screen()
+std::unique_ptr<Screen>
+MinimalApp::create_screen()
 {
     return nullptr;
 }
@@ -301,9 +298,10 @@ MinimalApp::loadConfig()
 {
 }
 
-bool MinimalApp::loadConfig(const std::string& pathname)
+bool
+MinimalApp::loadConfig(const std::string& pathname)
 {
-    (void) pathname;
+    (void)pathname;
 
     return false;
 }
@@ -323,8 +321,8 @@ MinimalApp::daemonName() const
 void
 MinimalApp::parseArgs(int argc, const char* const* argv)
 {
-    (void) argc;
-    (void) argv;
+    (void)argc;
+    (void)argv;
 }
 
 } // namespace inputleap

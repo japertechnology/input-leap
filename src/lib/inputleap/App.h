@@ -19,13 +19,14 @@
 #pragma once
 
 #include "Fwd.h"
-#include "base/Fwd.h"
-#include "ipc/IpcClient.h"
-#include "inputleap/IApp.h"
-#include "base/Log.h"
 #include "base/EventQueue.h"
-#include "net/SocketMultiplexer.h"
+#include "base/Fwd.h"
+#include "base/Log.h"
 #include "common/common.h"
+#include "inputleap/IApp.h"
+#include "ipc/IpcClient.h"
+#include "net/SocketMultiplexer.h"
+#include <functional>
 #include <memory>
 
 #if SYSAPI_WIN32
@@ -38,10 +39,12 @@ namespace inputleap {
 
 class IArchTaskBarReceiver;
 
-typedef IArchTaskBarReceiver* (*CreateTaskBarReceiverFunc)(const BufferedLogOutputter*, IEventQueue* events);
+typedef IArchTaskBarReceiver* (*CreateTaskBarReceiverFunc)(const BufferedLogOutputter*,
+                                                           IEventQueue* events);
 
-class App : public IApp {
-public:
+class App : public IApp
+{
+  public:
     App(IEventQueue* events, CreateTaskBarReceiverFunc createTaskBarReceiver, ArgsBase* args);
     ~App() override;
 
@@ -67,11 +70,8 @@ public:
     // A description of the daemon (used only on Windows).
     virtual const char* daemonInfo() const = 0;
 
-    // Function pointer for function to exit immediately.
-    // TODO: this is old C code - use inheritance to normalize
-    void (*m_bye)(int);
-
-    static App& instance() { assert(s_instance != nullptr); return *s_instance; }
+    // Function used to exit immediately.
+    std::function<void(int)> m_bye;
 
     // If --log was specified in args, then add a file logger.
     void setupFileLogging();
@@ -89,20 +89,23 @@ public:
 
     IArchTaskBarReceiver* taskBarReceiver() const override { return m_taskBarReceiver; }
 
-    void setByeFunc(void(*func)(int)) override { m_bye = func; }
+    void setByeFunc(std::function<void(int)> func) override { m_bye = std::move(func); }
     void bye(int error) override { m_bye(error); }
 
     IEventQueue* getEvents() const override { return m_events; }
 
-    void setSocketMultiplexer(std::unique_ptr<SocketMultiplexer>&& sm) { m_socketMultiplexer = std::move(sm); }
+    void setSocketMultiplexer(std::unique_ptr<SocketMultiplexer>&& sm)
+    {
+        m_socketMultiplexer = std::move(sm);
+    }
     SocketMultiplexer* getSocketMultiplexer() const { return m_socketMultiplexer.get(); }
 
     void setEvents(EventQueue& events) { m_events = &events; }
 
-private:
+  private:
     void handle_ipc_message(const Event& event);
 
-protected:
+  protected:
     void initIpcClient();
     void cleanupIpcClient();
     void run_events_loop();
@@ -111,9 +114,8 @@ protected:
     bool m_suspended;
     IEventQueue* m_events;
 
-private:
+  private:
     ArgsBase* m_args;
-    static App* s_instance;
     FileLogOutputter* m_fileLog;
     CreateTaskBarReceiverFunc m_createTaskBarReceiver;
     ARCH_APP_UTIL m_appUtil;
@@ -121,8 +123,9 @@ private:
     std::unique_ptr<SocketMultiplexer> m_socketMultiplexer;
 };
 
-class MinimalApp : public App {
-public:
+class MinimalApp : public App
+{
+  public:
     MinimalApp();
     ~MinimalApp() override;
 
@@ -139,7 +142,7 @@ public:
     const char* daemonName() const override;
     void parseArgs(int argc, const char* const* argv) override;
 
-private:
+  private:
     Arch m_arch;
     Log m_log;
     EventQueue m_events;
@@ -151,51 +154,49 @@ private:
 #define DAEMON_RUNNING(running_)
 #endif
 
-#define HELP_COMMON_INFO_1 \
-    "  -d, --debug <level>      filter out log messages with priority below level.\n" \
-    "                             level may be: FATAL, ERROR, WARNING, NOTE, INFO,\n" \
-    "                             DEBUG, DEBUG1, DEBUG2.\n" \
-    "  -n, --name <screen-name> use screen-name instead the hostname to identify\n" \
-    "                             this screen in the configuration.\n" \
-    "  -1, --no-restart         do not try to restart on failure.\n" \
-    "      --restart            restart the server automatically if it fails. (*)\n" \
-    "  -l  --log <file>         write log messages to file.\n" \
-    "      --no-tray            disable the system tray icon.\n" \
-    "      --enable-drag-drop   enable file drag & drop.\n" \
-    "      --enable-crypto      enable the crypto (ssl) plugin (default, deprecated).\n" \
-    "      --disable-crypto     disable the crypto (ssl) plugin.\n" \
-    "      --profile-dir <path> use named profile directory instead.\n" \
+#define HELP_COMMON_INFO_1                                                                         \
+    "  -d, --debug <level>      filter out log messages with priority below level.\n"              \
+    "                             level may be: FATAL, ERROR, WARNING, NOTE, INFO,\n"              \
+    "                             DEBUG, DEBUG1, DEBUG2.\n"                                        \
+    "  -n, --name <screen-name> use screen-name instead the hostname to identify\n"                \
+    "                             this screen in the configuration.\n"                             \
+    "  -1, --no-restart         do not try to restart on failure.\n"                               \
+    "      --restart            restart the server automatically if it fails. (*)\n"               \
+    "  -l  --log <file>         write log messages to file.\n"                                     \
+    "      --no-tray            disable the system tray icon.\n"                                   \
+    "      --enable-drag-drop   enable file drag & drop.\n"                                        \
+    "      --enable-crypto      enable the crypto (ssl) plugin (default, deprecated).\n"           \
+    "      --disable-crypto     disable the crypto (ssl) plugin.\n"                                \
+    "      --profile-dir <path> use named profile directory instead.\n"                            \
     "      --drop-dir <path>    use named drop target directory instead.\n"
 
-#define HELP_COMMON_INFO_2 \
-    "  -h, --help               display this help and exit.\n" \
+#define HELP_COMMON_INFO_2                                                                         \
+    "  -h, --help               display this help and exit.\n"                                     \
     "      --version            display version information and exit.\n"
 
-#define HELP_COMMON_ARGS \
-    " [--name <screen-name>]" \
-    " [--restart|--no-restart]" \
+#define HELP_COMMON_ARGS                                                                           \
+    " [--name <screen-name>]"                                                                      \
+    " [--restart|--no-restart]"                                                                    \
     " [--debug <level>]"
 
 // system args (windows/unix)
 #if SYSAPI_UNIX
 
 // unix daemon mode args
-#  define HELP_SYS_ARGS \
-    " [--daemon|--no-daemon]"
-#  define HELP_SYS_INFO \
-    "  -f, --no-daemon          run in the foreground.\n"    \
+#define HELP_SYS_ARGS " [--daemon|--no-daemon]"
+#define HELP_SYS_INFO                                                                              \
+    "  -f, --no-daemon          run in the foreground.\n"                                          \
     "      --daemon             run as a daemon. (*)\n"
 
 #elif SYSAPI_WIN32
 
 // windows args
-#  define HELP_SYS_ARGS \
-    " [--exit-pause]"
-#  define HELP_SYS_INFO \
-    "      --service <action>   manage the windows service, valid options are:\n" \
-    "                             install/uninstall/start/stop\n" \
-    "                             (obsolete, use input-leapd instead)\n" \
-    "      --exit-pause         wait for key press on exit, can be useful for\n" \
+#define HELP_SYS_ARGS " [--exit-pause]"
+#define HELP_SYS_INFO                                                                              \
+    "      --service <action>   manage the windows service, valid options are:\n"                  \
+    "                             install/uninstall/start/stop\n"                                  \
+    "                             (obsolete, use input-leapd instead)\n"                           \
+    "      --exit-pause         wait for key press on exit, can be useful for\n"                   \
     "                             reading error messages that occur on exit.\n"
 #endif
 
