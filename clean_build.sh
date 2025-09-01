@@ -49,9 +49,26 @@ set -e
 git submodule update --init --recursive
 
 # Remove any existing build directory to ensure a clean start
-rm -rf ${B_BUILD_DIR}
-mkdir ${B_BUILD_DIR}
-cd ${B_BUILD_DIR}
+if [ -z "$B_BUILD_DIR" ]; then
+    echo "ERROR: B_BUILD_DIR is empty; refusing to clean" >&2
+    exit 1
+fi
+
+REPO_ROOT=$(pwd -P)
+B_BUILD_DIR_ABS=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$B_BUILD_DIR")
+
+case "$B_BUILD_DIR_ABS" in
+    "$REPO_ROOT"/*)
+        ;;
+    *)
+        echo "ERROR: B_BUILD_DIR '$B_BUILD_DIR' is not within the repository root" >&2
+        exit 1
+        ;;
+esac
+
+rm -rf "$B_BUILD_DIR"
+mkdir "$B_BUILD_DIR"
+cd "$B_BUILD_DIR"
 echo "Starting Input Leap $B_BUILD_TYPE build in '${B_BUILD_DIR}'..."
 # Configure the project
 "$B_CMAKE" $B_CMAKE_FLAGS ..
