@@ -57,7 +57,15 @@ fi
 REPO_ROOT=$(pwd -P)
 B_BUILD_DIR_ABS=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$B_BUILD_DIR")
 
+
+# Validate that the build directory resides within the repository and is
+# not the repository root itself.  This guards against accidental deletion
+# of arbitrary paths when cleaning the build directory.
 case "$B_BUILD_DIR_ABS" in
+    "$REPO_ROOT")
+        echo "ERROR: B_BUILD_DIR '$B_BUILD_DIR' is the repository root" >&2
+        exit 1
+        ;;
     "$REPO_ROOT"/*)
         ;;
     *)
