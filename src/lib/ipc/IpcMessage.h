@@ -57,6 +57,17 @@ public:
     virtual ~IpcShutdownMessage();
 };
 
+class IpcConnectionStateMessage : public IpcMessage {
+public:
+    explicit IpcConnectionStateMessage(std::uint8_t state);
+    virtual ~IpcConnectionStateMessage();
+
+    std::uint8_t state() const { return state_; }
+
+private:
+    std::uint8_t state_;
+};
+
 
 class IpcLogLineMessage : public IpcMessage {
 public:

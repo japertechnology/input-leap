@@ -253,6 +253,7 @@ if(INPUTLEAP_BUILD_TESTS)
         test/KeySequenceTests.cpp
         test/HotkeyTests.cpp
         test/IpcClientTests.cpp
+        test/IpcStateTests.cpp
         test/main.cpp
     )
 

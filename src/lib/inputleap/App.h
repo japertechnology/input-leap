@@ -108,6 +108,7 @@ class App : public IApp
   protected:
     void initIpcClient();
     void cleanupIpcClient();
+    void sendConnectionState(std::uint8_t state);
     void run_events_loop();
 
     IArchTaskBarReceiver* m_taskBarReceiver;

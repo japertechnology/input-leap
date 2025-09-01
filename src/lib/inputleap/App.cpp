@@ -213,6 +213,15 @@ App::cleanupIpcClient()
 }
 
 void
+App::sendConnectionState(std::uint8_t state)
+{
+    if (m_ipcClient != nullptr) {
+        IpcConnectionStateMessage msg(state);
+        m_ipcClient->send(msg);
+    }
+}
+
+void
 App::handle_ipc_message(const Event& e)
 {
     const auto& m = e.get_data_as<IpcMessage>();

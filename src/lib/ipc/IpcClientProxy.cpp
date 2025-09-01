@@ -90,6 +90,11 @@ void IpcClientProxy::handle_data()
         else if (memcmp(code, kIpcMsgCommand, 4) == 0) {
             event_data = create_event_data<IpcCommandMessage>(parseCommand());
         }
+        else if (memcmp(code, kIpcMsgConnectionState, 4) == 0) {
+            std::uint8_t state;
+            ProtocolUtil::readf(stream_.get(), kIpcMsgConnectionState + 4, &state);
+            event_data = create_event_data<IpcConnectionStateMessage>(IpcConnectionStateMessage(state));
+        }
         else {
             LOG_ERR("invalid ipc message");
             disconnect();
@@ -118,6 +123,12 @@ IpcClientProxy::send(const IpcMessage& message)
         const IpcLogLineMessage& llm = static_cast<const IpcLogLineMessage&>(message);
         const std::string logLine = llm.logLine();
         ProtocolUtil::writef(stream_.get(), kIpcMsgLogLine, &logLine);
+        break;
+    }
+
+    case kIpcConnectionState: {
+        const IpcConnectionStateMessage& sm = static_cast<const IpcConnectionStateMessage&>(message);
+        ProtocolUtil::writef(stream_.get(), kIpcMsgConnectionState, sm.state());
         break;
     }
 

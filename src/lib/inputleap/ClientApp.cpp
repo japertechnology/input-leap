@@ -36,6 +36,7 @@
 #include "inputleap/Screen.h"
 #include "inputleap/XScreen.h"
 #include "inputleap/protocol_types.h"
+#include "ipc/AppConnectionState.h"
 #include "mt/Thread.h"
 #include "net/NetworkAddress.h"
 #include "net/SocketMultiplexer.h"
@@ -269,6 +270,7 @@ ClientApp::handle_client_connected()
     // using CLOG_PRINT here allows the GUI to see that the client is connected
     // regardless of which log level is set
     LOG_PRINT("connected to server");
+    sendConnectionState(static_cast<std::uint8_t>(AppConnectionState::CONNECTED));
     resetRestartTimeout();
     updateStatus();
 }
@@ -294,6 +296,7 @@ void
 ClientApp::handle_client_disconnected()
 {
     LOG_NOTE("disconnected from server");
+    sendConnectionState(static_cast<std::uint8_t>(AppConnectionState::DISCONNECTED));
     if (!args().m_restartable) {
         m_events->add_event(EventType::QUIT);
     } else if (!m_suspended) {

@@ -33,6 +33,7 @@
 #include "inputleap/ServerArgs.h"
 #include "inputleap/ServerTaskBarReceiver.h"
 #include "inputleap/XScreen.h"
+#include "ipc/AppConnectionState.h"
 #include "net/SocketMultiplexer.h"
 #include "net/TCPSocketFactory.h"
 #include "net/XSocket.h"
@@ -355,6 +356,7 @@ ServerApp::stopServer()
         server_.reset();
         m_listener = nullptr;
         m_serverState = kInitialized;
+        sendConnectionState(static_cast<std::uint8_t>(AppConnectionState::DISCONNECTED));
     } else if (m_serverState == kStarting) {
         stopRetryTimer();
         m_serverState = kInitialized;
@@ -551,6 +553,7 @@ ServerApp::startServer()
         // using CLOG_PRINT here allows the GUI to see that the server is started
         // regardless of which log level is set
         LOG_PRINT("started server (%s), waiting for clients", family);
+        sendConnectionState(static_cast<std::uint8_t>(AppConnectionState::CONNECTED));
         m_serverState = kStarted;
         return true;
     } catch (XSocketAddressInUse& e) {

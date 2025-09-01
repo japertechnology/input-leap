@@ -54,6 +54,9 @@ void IpcServerProxy::handle_data()
         if (memcmp(code, kIpcMsgLogLine, 4) == 0) {
             event_data = create_event_data<IpcLogLineMessage>(parseLogLine());
         }
+        else if (memcmp(code, kIpcMsgConnectionState, 4) == 0) {
+            event_data = create_event_data<IpcConnectionStateMessage>(parseConnectionState());
+        }
         else if (memcmp(code, kIpcMsgShutdown, 4) == 0) {
             event_data = create_event_data<IpcShutdownMessage>(IpcShutdownMessage{});
         }
@@ -89,6 +92,12 @@ IpcServerProxy::send(const IpcMessage& message)
         break;
     }
 
+    case kIpcConnectionState: {
+        const IpcConnectionStateMessage& sm = static_cast<const IpcConnectionStateMessage&>(message);
+        ProtocolUtil::writef(&m_stream, kIpcMsgConnectionState, sm.state());
+        break;
+    }
+
     default:
         LOG_ERR("ipc message not supported: %d", message.type());
         break;
@@ -102,6 +111,13 @@ IpcLogLineMessage IpcServerProxy::parseLogLine()
 
     // must be deleted by event handler.
     return IpcLogLineMessage(logLine);
+}
+
+IpcConnectionStateMessage IpcServerProxy::parseConnectionState()
+{
+    std::uint8_t state;
+    ProtocolUtil::readf(&m_stream, kIpcMsgConnectionState + 4, &state);
+    return IpcConnectionStateMessage(state);
 }
 
 void

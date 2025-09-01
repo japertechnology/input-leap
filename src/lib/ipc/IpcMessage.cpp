@@ -49,6 +49,16 @@ IpcShutdownMessage::~IpcShutdownMessage()
 {
 }
 
+IpcConnectionStateMessage::IpcConnectionStateMessage(std::uint8_t state) :
+    IpcMessage(kIpcConnectionState),
+    state_(state)
+{
+}
+
+IpcConnectionStateMessage::~IpcConnectionStateMessage()
+{
+}
+
 IpcLogLineMessage::IpcLogLineMessage(const std::string& logLine) :
     IpcMessage(kIpcLogLine),
     m_logLine(logLine)

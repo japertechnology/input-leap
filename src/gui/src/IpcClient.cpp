@@ -39,6 +39,7 @@ m_Enabled(false)
 
     m_Reader = new IpcReader(m_Socket);
     connect(m_Reader, &IpcReader::readLogLine, this, &IpcClient::handleReadLogLine);
+    connect(m_Reader, &IpcReader::connectionStateChanged, this, &IpcClient::connectionStateChanged);
 }
 
 IpcClient::~IpcClient()

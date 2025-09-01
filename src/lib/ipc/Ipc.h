@@ -24,6 +24,7 @@
 enum EIpcMessage {
     kIpcHello,
     kIpcLogLine,
+    kIpcConnectionState,
     kIpcCommand,
     kIpcShutdown,
 };
@@ -41,6 +42,10 @@ extern const char*        kIpcMsgHello;
 // log line: daemon -> gui
 // $1 = aggregate log lines collected from input-leaps/c or the daemon itself.
 extern const char*        kIpcMsgLogLine;
+
+// connection state: node -> daemon -> gui
+// $1 = numeric connection state value.
+extern const char*        kIpcMsgConnectionState;
 
 // command: gui -> daemon
 // $1 = command; the command for the daemon to launch, typically the full

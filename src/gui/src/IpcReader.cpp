@@ -78,6 +78,12 @@ void IpcReader::read()
 
             Q_EMIT readLogLine(line);
         }
+        else if (memcmp(codeBuf, kIpcMsgConnectionState, 4) == 0) {
+            char stateBuf[1];
+            readStream(stateBuf, 1);
+            AppConnectionState state = static_cast<AppConnectionState>(stateBuf[0]);
+            Q_EMIT connectionStateChanged(state);
+        }
         else {
             IPC_LOG(std::cerr << "aborting, message invalid" << std::endl);
             return;

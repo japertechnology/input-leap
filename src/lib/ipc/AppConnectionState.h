@@ -1,7 +1,6 @@
 /*
  * InputLeap -- mouse and keyboard sharing utility
- * Copyright (C) 2012-2016 Symless Ltd.
- * Copyright (C) 2012 Nick Bolton
+ * Copyright (C) InputLeap contributors
  *
  * This package is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -16,10 +15,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ipc/Ipc.h"
+#pragma once
 
-const char*                kIpcMsgHello        = "IHEL%1i";
-const char*                kIpcMsgLogLine        = "ILOG%s";
-const char*                kIpcMsgConnectionState = "ICST%1i";
-const char*                kIpcMsgCommand        = "ICMD%s%1i";
-const char*                kIpcMsgShutdown        = "ISDN";
+#include <cstdint>
+
+enum class AppConnectionState : std::uint8_t {
+    DISCONNECTED = 0,
+    CONNECTING = 1,
+    CONNECTED = 2,
+    TRANSFERRING = 3
+};

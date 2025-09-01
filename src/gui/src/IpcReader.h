@@ -20,6 +20,7 @@
 
 #include <QObject>
 #include <QMutex>
+#include "AppConnectionState.h"
 
 class QTcpSocket;
 
@@ -35,6 +36,7 @@ public:
 
 Q_SIGNALS:
     void readLogLine(const QString& text);
+    void connectionStateChanged(AppConnectionState state);
 
 private:
     bool readStream(char* buffer, int length);
