@@ -48,9 +48,13 @@ if (BUILD_XWINDOWS)
     file(GLOB portal_sources "platform/Portal*.cpp")
     file(GLOB portal_headers "platform/Portal*.h")
 endif()
+if (UNIX)
+    file(GLOB daemon_unix_sources "platform/ArchDaemonUnix*.cpp")
+    file(GLOB daemon_unix_headers "platform/ArchDaemonUnix*.h")
+endif()
 
-list(APPEND sources ${mswin_sources} ${carbon_sources} ${xwin_sources} ${portal_sources})
-list(APPEND headers ${mswin_headers} ${carbon_headers} ${xwin_headers} ${portal_headers})
+list(APPEND sources ${mswin_sources} ${carbon_sources} ${xwin_sources} ${portal_sources} ${daemon_unix_sources})
+list(APPEND headers ${mswin_headers} ${carbon_headers} ${xwin_headers} ${portal_headers} ${daemon_unix_headers})
 
 include_directories(
     ../../
