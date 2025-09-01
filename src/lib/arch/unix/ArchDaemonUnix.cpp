@@ -18,22 +18,52 @@
 
 #include "arch/unix/ArchDaemonUnix.h"
 
-#include "arch/unix/XArchUnix.h"
 #include "arch/XArch.h"
+#include "arch/unix/XArchUnix.h"
 #include "base/Log.h"
 
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <errno.h>
 #include <cstdlib>
+#include <errno.h>
+#include <fcntl.h>
+#include <string>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #ifdef __APPLE__
 extern char** NXArgv;
 #endif
 
 namespace inputleap {
+
+namespace {
+
+pid_t (*g_fork)() = ::fork;
+int (*g_setsid)() = ::setsid;
+int (*g_open)(const char*, int, ...) = ::open;
+int (*g_dup)(int) = ::dup;
+int (*g_chdir)(const char*) = ::chdir;
+int (*g_close)(int) = ::close;
+
+} // namespace
+
+#if defined(INPUTLEAP_BUILD_TESTS)
+void
+setArchDaemonUnixHooks(pid_t (*forkHook)(),
+                       int (*setsidHook)(),
+                       int (*openHook)(const char*, int, ...),
+                       int (*dupHook)(int),
+                       int (*chdirHook)(const char*),
+                       int (*closeHook)(int))
+{
+    g_fork = forkHook ? forkHook : ::fork;
+    g_setsid = setsidHook ? setsidHook : ::setsid;
+    g_open = openHook ? openHook : ::open;
+    g_dup = dupHook ? dupHook : ::dup;
+    g_chdir = chdirHook ? chdirHook : ::chdir;
+    g_close = closeHook ? closeHook : ::close;
+}
+#endif
 
 ArchDaemonUnix::ArchDaemonUnix()
 {
@@ -44,7 +74,6 @@ ArchDaemonUnix::~ArchDaemonUnix()
 {
     // do nothing
 }
-
 
 #ifdef __APPLE__
 
@@ -62,7 +91,9 @@ execSelfNonDaemonized()
     return 0;
 }
 
-bool alreadyDaemonized() {
+bool
+alreadyDaemonized()
+{
     return std::getenv("_INPUTLEAP_DAEMONIZED") != nullptr;
 }
 
@@ -78,51 +109,67 @@ ArchDaemonUnix::daemonize(const char* name, DaemonFunc func)
 
     // fork so shell thinks we're done and so we're not a process
     // group leader
-    switch (fork()) {
-    case -1:
-        // failed
-        throw XArchDaemonFailed(error_code_to_string_errno(errno));
+    switch (g_fork()) {
+        case -1:
+            // failed
+            throw XArchDaemonFailed(error_code_to_string_errno(errno));
 
-    case 0:
-        // child
-        break;
+        case 0:
+            // child
+            break;
 
-    default:
-        // parent exits
-        exit(0);
+        default:
+            // parent exits
+            exit(0);
     }
 
     // become leader of a new session
-    setsid();
+    if (g_setsid() < 0) {
+        std::string err = error_code_to_string_errno(errno);
+        LOG_ERR("setsid error: %s", err.c_str());
+        throw XArchDaemonFailed(err);
+    }
 
 #ifndef __APPLE__
     // NB: don't run chdir on apple; causes strange behaviour.
     // chdir to root so we don't keep mounted filesystems points busy
     // TODO: this is a bit of a hack - can we find a better solution?
-    int chdirErr = chdir("/");
-    if (chdirErr)
-        // NB: file logging actually isn't working at this point!
-        LOG_ERR("chdir error: %i", chdirErr);
+    int chdirErr = g_chdir("/");
+    if (chdirErr) {
+        std::string err = error_code_to_string_errno(errno);
+        LOG_ERR("chdir error: %s", err.c_str());
+        throw XArchDaemonFailed(err);
+    }
 #endif
 
     // mask off permissions for any but owner
     umask(077);
 
     // close open files.  we only expect stdin, stdout, stderr to be open.
-    close(0);
-    close(1);
-    close(2);
+    g_close(0);
+    g_close(1);
+    g_close(2);
 
     // attach file descriptors 0, 1, 2 to /dev/null so inadvertent use
     // of standard I/O safely goes in the bit bucket.
-    open("/dev/null", O_RDONLY);
-    open("/dev/null", O_RDWR);
+    int fd = g_open("/dev/null", O_RDONLY);
+    if (fd < 0) {
+        std::string err = error_code_to_string_errno(errno);
+        LOG_ERR("open error: %s", err.c_str());
+        throw XArchDaemonFailed(err);
+    }
+    fd = g_open("/dev/null", O_RDWR);
+    if (fd < 0) {
+        std::string err = error_code_to_string_errno(errno);
+        LOG_ERR("open error: %s", err.c_str());
+        throw XArchDaemonFailed(err);
+    }
 
-    int dupErr = dup(1);
-
+    int dupErr = g_dup(1);
     if (dupErr < 0) {
-        // NB: file logging actually isn't working at this point!
-        LOG_ERR("dup error: %i", dupErr);
+        std::string err = error_code_to_string_errno(errno);
+        LOG_ERR("dup error: %s", err.c_str());
+        throw XArchDaemonFailed(err);
     }
 
 #ifdef __APPLE__
