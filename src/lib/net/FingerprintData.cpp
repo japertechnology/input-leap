@@ -27,6 +27,12 @@ bool FingerprintData::operator==(const FingerprintData& other) const
     return algorithm == other.algorithm && data == other.data;
 }
 
+/**
+ * @brief Return a text description of a fingerprint type.
+ *
+ * This helper is primarily used when serialising fingerprints to
+ * configuration files or log output.
+ */
 const char* fingerprint_type_to_string(FingerprintType type)
 {
     switch (type) {
@@ -39,6 +45,11 @@ const char* fingerprint_type_to_string(FingerprintType type)
     return "invalid";
 }
 
+/**
+ * @brief Convert a string representation to a FingerprintType.
+ *
+ * The comparison is case-sensitive and only accepts recognised names.
+ */
 FingerprintType fingerprint_type_from_string(const std::string& type)
 {
     if (type == "sha1") {
