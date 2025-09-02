@@ -2065,8 +2065,11 @@ Server::removeClient(BaseClientProxy* client)
 void
 Server::closeClient(BaseClientProxy* client, const char* msg)
 {
-	assert(client != m_primaryClient);
-	assert(msg != nullptr);
+       assert(client != m_primaryClient);
+       if (msg == nullptr) {
+               LOG_ERR("closeClient called with null msg");
+               return;
+       }
 
 	// send message to client.  this message should cause the client
 	// to disconnect.  we add this client to the closed client list
