@@ -1,0 +1,1 @@
+Add null-safe error handling when initializing or connecting InputCapture sessions.

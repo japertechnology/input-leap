@@ -173,8 +173,12 @@ void PortalInputCapture::cb_init_input_capture_session(GObject* object, GAsyncRe
     auto session =
         xdp_portal_create_input_capture_session_finish(XDP_PORTAL(object), res, &error);
     if (!session) {
-        const char* msg = error ? error->message : "unknown error";
-        LOG_ERR("Failed to initialize InputCapture session, quitting: %s", msg);
+        if (error != nullptr) {
+            LOG_ERR("Failed to initialize InputCapture session, quitting: %s", error->message);
+        }
+        else {
+            LOG_ERR("Failed to initialize InputCapture session, quitting: unknown error");
+        }
         g_main_loop_quit(glib_main_loop_);
         events_->add_event(EventType::QUIT);
         return;
@@ -184,8 +188,12 @@ void PortalInputCapture::cb_init_input_capture_session(GObject* object, GAsyncRe
 
     auto fd = xdp_input_capture_session_connect_to_eis(session, &error);
     if (fd < 0) {
-        const char* msg = error ? error->message : "unknown error";
-        LOG_ERR("Failed to connect to EIS: %s", msg);
+        if (error != nullptr) {
+            LOG_ERR("Failed to connect to EIS: %s", error->message);
+        }
+        else {
+            LOG_ERR("Failed to connect to EIS: unknown error");
+        }
         g_main_loop_quit(glib_main_loop_);
         events_->add_event(EventType::QUIT);
         return;
