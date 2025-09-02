@@ -170,9 +170,11 @@ void PortalInputCapture::cb_init_input_capture_session(GObject* object, GAsyncRe
     LOG_DEBUG("Session ready");
     g_autoptr(GError) error = nullptr;
 
-    auto session = xdp_portal_create_input_capture_session_finish(XDP_PORTAL(object), res, &error);
+    auto session =
+        xdp_portal_create_input_capture_session_finish(XDP_PORTAL(object), res, &error);
     if (!session) {
-        LOG_ERR("Failed to initialize InputCapture session, quitting: %s", error->message);
+        const char* msg = error ? error->message : "unknown error";
+        LOG_ERR("Failed to initialize InputCapture session, quitting: %s", msg);
         g_main_loop_quit(glib_main_loop_);
         events_->add_event(EventType::QUIT);
         return;
@@ -182,17 +184,11 @@ void PortalInputCapture::cb_init_input_capture_session(GObject* object, GAsyncRe
 
     auto fd = xdp_input_capture_session_connect_to_eis(session, &error);
     if (fd < 0) {
-            LOG_ERR("Failed to connect to EIS: %s", error->message);
-
-            // FIXME: Development hack to avoid having to assemble all parts just for
-            // testing this code.
-            fd = fake_eis_fd();
-
-            if (fd < 0) {
-                g_main_loop_quit(glib_main_loop_);
-                events_->add_event(EventType::QUIT);
-                return;
-            }
+        const char* msg = error ? error->message : "unknown error";
+        LOG_ERR("Failed to connect to EIS: %s", msg);
+        g_main_loop_quit(glib_main_loop_);
+        events_->add_event(EventType::QUIT);
+        return;
     }
     // Socket ownership is transferred to the EiScreen
     events_->add_event(EventType::EI_SCREEN_CONNECTED_TO_EIS, screen_->get_event_target(),
