@@ -366,6 +366,12 @@ ProtocolUtil::writef_void(void* buffer, const char* fmt, va_list args)
 {
     std::uint8_t* dst = static_cast<std::uint8_t*>(buffer);
 
+    // determine the end of the buffer so we can detect overflow when copying
+    va_list argsCopy;
+    va_copy(argsCopy, args);
+    const std::uint8_t* const dst_end = dst + getLength(fmt, argsCopy);
+    va_end(argsCopy);
+
     while (*fmt) {
         if (*fmt == '%') {
             // format specifier.  determine argument size.
@@ -470,10 +476,14 @@ ProtocolUtil::writef_void(void* buffer, const char* fmt, va_list args)
                 *dst++ = static_cast<std::uint8_t>((str_len >> 16) & 0xff);
                 *dst++ = static_cast<std::uint8_t>((str_len >> 8) & 0xff);
                 *dst++ = static_cast<std::uint8_t>(str_len & 0xff);
-                if (str_len != 0) {
-                    memcpy(dst, src->data(), str_len);
-                    dst += str_len;
+                const std::uint32_t capacity = static_cast<std::uint32_t>(dst_end - dst);
+                if (str_len > capacity) {
+                    throw XBadClient("Too long message received");
                 }
+                if (str_len != 0 && src != nullptr) {
+                    memcpy(dst, src->data(), str_len);
+                }
+                dst += str_len;
                 break;
             }
 
@@ -485,7 +495,13 @@ ProtocolUtil::writef_void(void* buffer, const char* fmt, va_list args)
                 *dst++ = static_cast<std::uint8_t>((str_len >> 16) & 0xff);
                 *dst++ = static_cast<std::uint8_t>((str_len >> 8) & 0xff);
                 *dst++ = static_cast<std::uint8_t>(str_len & 0xff);
-                memcpy(dst, src, str_len);
+                const std::uint32_t capacity = static_cast<std::uint32_t>(dst_end - dst);
+                if (str_len > capacity) {
+                    throw XBadClient("Too long message received");
+                }
+                if (str_len != 0 && src != nullptr) {
+                    memcpy(dst, src, str_len);
+                }
                 dst += str_len;
                 break;
             }
