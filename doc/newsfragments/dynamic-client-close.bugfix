@@ -1,0 +1,2 @@
+Use dynamic_cast when closing clients to ensure correct type and log an error if the cast fails.
+

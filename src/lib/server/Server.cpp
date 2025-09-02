@@ -2078,9 +2078,14 @@ Server::closeClient(BaseClientProxy* client, const char* msg)
 	// client.
 	LOG_NOTE("disconnecting client \"%s\"", getName(client).c_str());
 
-	// send message
-	// FIXME -- avoid type cast (kinda hard, though)
-    (static_cast<ClientProxy*>(client))->close(msg);
+        // send message
+        // FIXME -- avoid type cast (kinda hard, though)
+        if (auto* clientProxy = dynamic_cast<ClientProxy*>(client)) {
+            clientProxy->close(msg);
+        }
+        else {
+            LOG_ERR("client \"%s\" is not a ClientProxy; skipping close", getName(client).c_str());
+        }
 
 	// install timer.  wait timeout seconds for client to close.
 	double timeout = 5.0;
