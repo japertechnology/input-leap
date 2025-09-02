@@ -184,64 +184,85 @@ QString KeySequence::keyToString(int key)
     if (key == 0)
         return "";
 
+    QStringList modifiers;
+    if (key & Qt::ShiftModifier) {
+        modifiers << "Shift";
+        key &= ~Qt::ShiftModifier;
+    }
+    if (key & Qt::ControlModifier) {
+        modifiers << "Control";
+        key &= ~Qt::ControlModifier;
+    }
+    if (key & Qt::AltModifier) {
+        modifiers << "Alt";
+        key &= ~Qt::AltModifier;
+    }
+    if (key & Qt::MetaModifier) {
+        modifiers << "Meta";
+        key &= ~Qt::MetaModifier;
+    }
+
     // a hack to handle mouse buttons as if they were keys
     if (key < Qt::Key_Space)
     {
+        QString button;
         switch(key)
         {
-            case Qt::LeftButton: return "1";
-            case Qt::RightButton: return "2";
+            case Qt::LeftButton: button = "1"; break;
+            case Qt::RightButton: button = "2"; break;
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-            case Qt::MiddleButton: return "3";
+            case Qt::MiddleButton: button = "3"; break;
 #else
-            case Qt::MidButton: return "3";
+            case Qt::MidButton: button = "3"; break;
 #endif
         default:
+            button = "4"; // qt only knows three mouse buttons, so assume it's an unknown fourth one
             break;
         }
 
-        return "4"; // qt only knows three mouse buttons, so assume it's an unknown fourth one
+        return modifiers.isEmpty() ? button : modifiers.join("+") + "+" + button;
     }
 
-    // modifiers?
-    if (key & Qt::ShiftModifier)
-        return "Shift";
-
-    if (key & Qt::ControlModifier)
-        return "Control";
-
-    if (key & Qt::AltModifier)
-        return "Alt";
-
-    if (key & Qt::MetaModifier)
-        return "Meta";
-
     // treat key pad like normal keys (FIXME: we should have another lookup table for keypad keys instead)
-     key &= ~Qt::KeypadModifier;
+    key &= ~Qt::KeypadModifier;
+
+    QString base;
 
     // a special key?
     int i = 0;
     while (keyname[i].name) {
-        if (key == keyname[i].key)
-            return QString::fromUtf8(keyname[i].name);
+        if (key == keyname[i].key) {
+            base = QString::fromUtf8(keyname[i].name);
+            break;
+        }
         i++;
     }
 
     // a printable 7 bit character?
-     if (key < 0x80)
-         return QChar(key & 0x7f).toLower();
+    if (base.isEmpty() && key < 0x80)
+        base = QChar(key & 0x7f).toLower();
 
     // a function key?
-    if (key >= Qt::Key_F1 && key <= Qt::Key_F35)
-        return QString::fromUtf8("F%1").arg(key - Qt::Key_F1 + 1);
+    if (base.isEmpty() && key >= Qt::Key_F1 && key <= Qt::Key_F35)
+        base = QString::fromUtf8("F%1").arg(key - Qt::Key_F1 + 1);
 
     // representable in ucs2?
-    if (key < 0x10000)
+    if (base.isEmpty() && key < 0x10000)
 #if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
-        return QString("\\u%1").arg((uint16_t) QChar(key).toLower().unicode(), 4, 16, QChar('0'));
+        base = QString("\\u%1").arg((uint16_t) QChar(key).toLower().unicode(), 4, 16, QChar('0'));
 #else
-        return QString("\\u%1").arg(QChar(key).toLower().unicode(), 4, 16, QChar('0'));
+        base = QString("\\u%1").arg(QChar(key).toLower().unicode(), 4, 16, QChar('0'));
 #endif
+
+    if (base.isEmpty() && !modifiers.isEmpty())
+        return modifiers.join("+");
+
+    if (!modifiers.isEmpty() && !base.isEmpty())
+        return modifiers.join("+") + "+" + base;
+
+    if (!base.isEmpty())
+        return base;
+
     // give up, InputLeap probably won't handle this
     return "";
 }
